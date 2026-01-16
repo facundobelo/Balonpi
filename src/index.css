@@ -1,0 +1,348 @@
+@import "tailwindcss";
+
+/* =============================================================================
+   CYBERFOOT 2026 - LIGHT GREEN THEME
+   "Fresh & Modern Football Manager"
+============================================================================= */
+
+:root {
+  /* Color Palette - Light Green */
+  --color-bg-primary: #f0fdf4;
+  --color-bg-secondary: #dcfce7;
+  --color-bg-tertiary: #bbf7d0;
+  --color-bg-card: #ffffff;
+  --color-bg-hover: #d1fae5;
+
+  /* Text Colors */
+  --color-text-primary: #14532d;
+  --color-text-secondary: #166534;
+  --color-text-muted: #4ade80;
+
+  /* Accent Colors */
+  --color-accent-green: #16a34a;
+  --color-accent-green-dim: #15803d;
+  --color-accent-red: #dc2626;
+  --color-accent-red-dim: #b91c1c;
+  --color-accent-yellow: #ca8a04;
+  --color-accent-blue: #2563eb;
+  --color-accent-cyan: #0891b2;
+
+  /* Form Arrows */
+  --color-form-up: #15803d;
+  --color-form-slight-up: #65a30d;
+  --color-form-mid: #6b7280;
+  --color-form-slight-down: #ea580c;
+  --color-form-down: #dc2626;
+
+  /* Position Fit Colors */
+  --color-pos-natural: #15803d;
+  --color-pos-alt: #65a30d;
+  --color-pos-adjacent: #ca8a04;
+  --color-pos-invalid: #dc2626;
+
+  /* Borders */
+  --color-border: #86efac;
+  --color-border-hover: #4ade80;
+
+  /* Fonts */
+  --font-sans: 'Inter', 'SF Pro Display', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+
+  /* Spacing */
+  --spacing-touch: 44px; /* Minimum touch target */
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+
+  /* Shadows */
+  --shadow-card: 0 2px 8px rgba(22, 163, 74, 0.15);
+  --shadow-modal: 0 8px 32px rgba(22, 163, 74, 0.25);
+}
+
+/* =============================================================================
+   BASE STYLES
+============================================================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* =============================================================================
+   TYPOGRAPHY
+============================================================================= */
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+/* Data/Numbers in Monospace */
+.font-data {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* =============================================================================
+   CUSTOM COMPONENTS
+============================================================================= */
+
+/* Card Component */
+.card {
+  background-color: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+
+.card:hover {
+  border-color: var(--color-border-hover);
+}
+
+/* Touch-friendly Button */
+.btn {
+  min-height: var(--spacing-touch);
+  padding: 0.75rem 1.25rem;
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+}
+
+.btn-primary {
+  background-color: var(--color-accent-green);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--color-accent-green-dim);
+}
+
+.btn-danger {
+  background-color: var(--color-accent-red);
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: var(--color-accent-red-dim);
+}
+
+.btn-ghost {
+  background-color: transparent;
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+}
+
+.btn-ghost:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-border-hover);
+}
+
+/* =============================================================================
+   FORM ARROWS (Condition Indicators)
+============================================================================= */
+
+.arrow-up { color: var(--color-form-up); }
+.arrow-slight-up { color: var(--color-form-slight-up); }
+.arrow-mid { color: var(--color-form-mid); }
+.arrow-slight-down { color: var(--color-form-slight-down); }
+.arrow-down { color: var(--color-form-down); }
+
+/* =============================================================================
+   POSITION FIT INDICATORS
+============================================================================= */
+
+.pos-natural { color: var(--color-pos-natural); }
+.pos-alt { color: var(--color-pos-alt); }
+.pos-adjacent { color: var(--color-pos-adjacent); }
+.pos-invalid { color: var(--color-pos-invalid); }
+
+/* =============================================================================
+   SIMULCAST MATCH ROW
+============================================================================= */
+
+.match-row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  font-family: var(--font-mono);
+  transition: background-color var(--transition-fast);
+}
+
+.match-row:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.match-row.goal-flash {
+  animation: goalFlash 0.5s ease;
+}
+
+@keyframes goalFlash {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: rgba(22, 163, 74, 0.25); }
+}
+
+.match-row.user-match {
+  background-color: var(--color-bg-secondary);
+  border-left: 3px solid var(--color-accent-cyan);
+}
+
+/* =============================================================================
+   SKILL BAR
+============================================================================= */
+
+.skill-bar {
+  height: 6px;
+  background-color: var(--color-bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.skill-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--color-accent-green-dim), var(--color-accent-green));
+  border-radius: 3px;
+  transition: width var(--transition-normal);
+}
+
+/* =============================================================================
+   BOTTOM NAVIGATION (Mobile First)
+============================================================================= */
+
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 64px;
+  background-color: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 50;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 1rem;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-size: 0.75rem;
+  transition: color var(--transition-fast);
+}
+
+.nav-item.active {
+  color: var(--color-accent-green);
+}
+
+.nav-item:hover {
+  color: var(--color-text-primary);
+}
+
+/* =============================================================================
+   SCROLLBAR (Terminal Style)
+============================================================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-accent-green);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent-green-dim);
+}
+
+/* =============================================================================
+   UTILITY CLASSES
+============================================================================= */
+
+.safe-bottom {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom));
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Nemesis match red theme */
+.nemesis-theme {
+  --color-accent-primary: var(--color-accent-red);
+  background-color: rgba(239, 68, 68, 0.05);
+  border-color: var(--color-accent-red);
+}
+
+/* =============================================================================
+   PAGE TRANSITIONS
+============================================================================= */
+
+.page-enter {
+  opacity: 0;
+  transform: translateX(10px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.page-exit {
+  opacity: 1;
+}
+
+.page-exit-active {
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
