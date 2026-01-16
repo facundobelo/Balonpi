@@ -338,6 +338,55 @@ class SaveManager {
   }
 
   /**
+   * Check if all league fixtures are finished and process season end if needed
+   * Returns true if season was ended
+   */
+  checkAndProcessSeasonEnd(): boolean {
+    if (!this.currentSave || !this.currentSave.fixtures) return false;
+
+    // Find user's league
+    const userClub = this.currentSave.clubs.find(c => c.id === this.currentSave!.userClubId);
+    if (!userClub) return false;
+
+    const userLeague = this.currentSave.competitions.find(c =>
+      c.type === 'LEAGUE' && c.teamIds?.includes(userClub.id)
+    );
+    if (!userLeague) return false;
+
+    const leagueFixtures = this.currentSave.fixtures[userLeague.id];
+    if (!leagueFixtures || leagueFixtures.length === 0) return false;
+
+    // Check if all fixtures in user's league are finished
+    const allFinished = leagueFixtures.every(f => f.status === 'FINISHED');
+    if (!allFinished) return false;
+
+    console.log('All league fixtures finished! Processing season end...');
+
+    // Get current date and advance to July 1st for new season
+    const currentDate = new Date(this.currentSave.gameDate);
+    const currentYear = currentDate.getFullYear();
+
+    // Determine which July 1st to use
+    // If we're before July, use current year's July 1st
+    // If we're in/after July, use next year's July 1st
+    let newSeasonDate: Date;
+    if (currentDate.getMonth() < 6) { // Before July
+      newSeasonDate = new Date(currentYear, 6, 1); // July 1st of current year
+    } else {
+      newSeasonDate = new Date(currentYear + 1, 6, 1); // July 1st of next year
+    }
+
+    // Update game date to new season start
+    this.currentSave.gameDate = newSeasonDate.toISOString().split('T')[0];
+
+    // Process the new season
+    this.processNewSeason(newSeasonDate);
+
+    this.scheduleAutoSave();
+    return true;
+  }
+
+  /**
    * Save current game state
    */
   async save(): Promise<void> {
@@ -479,17 +528,15 @@ class SaveManager {
   private processNewSeason(currentDate: Date): void {
     if (!this.currentSave) return;
 
+    // Save the previous season BEFORE updating
+    const previousSeason = this.currentSave.season;
+
     const year = currentDate.getFullYear();
     const newSeason = `${year}-${year + 1}`;
 
-    console.log(`Processing new season: ${newSeason}`);
-    this.currentSave.season = newSeason;
-
-    // Process end-of-season development (aging, skill changes)
-    processSeasonDevelopment(this.currentSave.players);
+    console.log(`Processing new season: ${previousSeason} -> ${newSeason}`);
 
     // Save previous season stats to career history before resetting
-    const previousSeason = this.currentSave.season;
     for (const player of this.currentSave.players) {
       // Only save to history if player had appearances
       if (player.currentSeasonStats.appearances > 0) {
@@ -530,6 +577,12 @@ class SaveManager {
       player.suspendedUntil = null;
       player.suspensionReason = undefined;
     }
+
+    // NOW update the season after saving stats
+    this.currentSave.season = newSeason;
+
+    // Process end-of-season development (aging, skill changes)
+    processSeasonDevelopment(this.currentSave.players);
 
     // Reset standings for new season
     for (const competition of this.currentSave.competitions) {

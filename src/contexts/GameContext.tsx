@@ -697,6 +697,19 @@ export function GameProvider({ children }: GameProviderProps) {
     currentDate.setDate(currentDate.getDate() + 7);
     currentSave.gameDate = currentDate.toISOString().split('T')[0];
 
+    // Check if season should end (all league fixtures finished)
+    const seasonEnded = saveManager.checkAndProcessSeasonEnd();
+    if (seasonEnded) {
+      // Season ended, get the updated save from saveManager
+      const updatedSave = saveManager.getCurrentSave();
+      if (updatedSave) {
+        // Also update local fixtures state with new season fixtures
+        setFixtures(updatedSave.fixtures || null);
+        setCurrentSave({ ...updatedSave });
+        return;
+      }
+    }
+
     // Save and update state
     saveManager.scheduleAutoSave();
     setCurrentSave({ ...currentSave });
@@ -1293,8 +1306,22 @@ export function GameProvider({ children }: GameProviderProps) {
       currentSave.gameDate = lastSimulatedFixture.date;
     }
 
-    // Update fixtures and save
+    // Update fixtures in save before checking season end
     currentSave.fixtures = { ...fixtures };
+
+    // Check if season should end (all league fixtures finished)
+    const seasonEnded = saveManager.checkAndProcessSeasonEnd();
+    if (seasonEnded) {
+      // Season ended, get the updated save from saveManager
+      const updatedSave = saveManager.getCurrentSave();
+      if (updatedSave) {
+        setFixtures(updatedSave.fixtures || null);
+        setCurrentSave({ ...updatedSave });
+        return;
+      }
+    }
+
+    // Update fixtures and save
     setFixtures({ ...fixtures });
     saveManager.scheduleAutoSave();
     setCurrentSave({ ...currentSave });
