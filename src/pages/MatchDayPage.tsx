@@ -1,5 +1,5 @@
 /**
- * MatchDayPage - Live match simulation UI (Cyberfoot-style)
+ * MatchDayPage - Live match simulation UI (BALONPI-style)
  *
  * Shows:
  * - Pre-match: Team lineups with pitch view, tactics selection
@@ -358,7 +358,7 @@ export function MatchDayPage({ opponentClubId, isHome, competitionName, onFinish
   }
 
   // ============================================================
-  // LIVE MATCH SCREEN (Cyberfoot-style with all fixtures)
+  // LIVE MATCH SCREEN (BALONPI-style with all fixtures)
   // ============================================================
   if (phase === 'live' && matchState) {
     // Get momentum indicator

@@ -98,7 +98,7 @@ export interface SaveSlot {
   updatedAt: string;
 }
 
-const DB_NAME = 'cyberfoot2026';
+const DB_NAME = 'balonpi2026';
 const DB_VERSION = 1;
 
 class SaveManager {
@@ -385,32 +385,236 @@ class SaveManager {
       processWeeklyFormChanges(this.currentSave.players);
     }
 
+    // Clear expired injuries and suspensions
+    this.clearExpiredPlayerStatus();
+
     // Check for season change (July 1st = new season)
-    if (current.getMonth() === 6 && current.getDate() <= days) {
-      const year = current.getFullYear();
-      this.currentSave.season = `${year}-${year + 1}`;
+    const previousSeason = previousDate.getFullYear();
+    const currentSeason = current.getFullYear();
+    const crossedJuly1 = (previousDate.getMonth() < 6 || (previousDate.getMonth() === 6 && previousDate.getDate() === 0))
+                         && (current.getMonth() >= 6);
 
-      // Process end-of-season development (aging, skill changes)
-      processSeasonDevelopment(this.currentSave.players);
+    if (crossedJuly1 || (current.getMonth() === 6 && current.getDate() === 1 && previousDate.getMonth() !== 6)) {
+      this.processNewSeason(current);
+    }
 
-      // Reset standings for new season
-      for (const competition of this.currentSave.competitions) {
-        if (competition.standings) {
-          for (const standing of competition.standings) {
-            standing.played = 0;
-            standing.won = 0;
-            standing.drawn = 0;
-            standing.lost = 0;
-            standing.goalsFor = 0;
-            standing.goalsAgainst = 0;
-            standing.points = 0;
-            standing.form = [];
-          }
+    this.scheduleAutoSave();
+  }
+
+  /**
+   * Clear expired injuries and suspensions
+   */
+  private clearExpiredPlayerStatus(): void {
+    if (!this.currentSave) return;
+
+    const currentDate = this.currentSave.gameDate;
+    for (const player of this.currentSave.players) {
+      // Clear expired injuries
+      if (player.injuredUntil && player.injuredUntil <= currentDate) {
+        player.injuredUntil = null;
+      }
+      // Clear expired suspensions
+      if (player.suspendedUntil && player.suspendedUntil <= currentDate) {
+        player.suspendedUntil = null;
+        player.suspensionReason = undefined;
+      }
+    }
+  }
+
+  /**
+   * Process transition to a new season
+   */
+  private processNewSeason(currentDate: Date): void {
+    if (!this.currentSave) return;
+
+    const year = currentDate.getFullYear();
+    const newSeason = `${year}-${year + 1}`;
+
+    console.log(`Processing new season: ${newSeason}`);
+    this.currentSave.season = newSeason;
+
+    // Process end-of-season development (aging, skill changes)
+    processSeasonDevelopment(this.currentSave.players);
+
+    // Reset player season stats completely
+    for (const player of this.currentSave.players) {
+      player.currentSeasonStats = {
+        goals: 0,
+        assists: 0,
+        cleanSheets: 0,
+        appearances: 0,
+        yellowCards: 0,
+        redCards: 0,
+        avgRating: 6.5,
+      };
+      // Clear any lingering injuries/suspensions from old season
+      player.injuredUntil = null;
+      player.suspendedUntil = null;
+      player.suspensionReason = undefined;
+    }
+
+    // Reset standings for new season
+    for (const competition of this.currentSave.competitions) {
+      if (competition.standings) {
+        for (const standing of competition.standings) {
+          standing.played = 0;
+          standing.won = 0;
+          standing.drawn = 0;
+          standing.lost = 0;
+          standing.goalsFor = 0;
+          standing.goalsAgainst = 0;
+          standing.points = 0;
+          standing.form = [];
         }
       }
     }
 
-    this.scheduleAutoSave();
+    // Generate new season fixtures
+    this.generateNewSeasonFixtures(currentDate);
+
+    // Clear old match history (keep last 50 for reference)
+    this.currentSave.matchHistory = this.currentSave.matchHistory.slice(-50);
+
+    // Keep only last 30 news items
+    this.currentSave.newsItems = this.currentSave.newsItems.slice(0, 30);
+
+    // Generate new board objectives
+    const userClub = this.currentSave.clubs.find(c => c.id === this.currentSave!.userClubId);
+    this.currentSave.boardObjectives = this.generateBoardObjectives(userClub, newSeason);
+  }
+
+  /**
+   * Generate fixtures for a new season
+   */
+  private generateNewSeasonFixtures(startDate: Date): void {
+    if (!this.currentSave) return;
+
+    const newFixtures: { [competitionId: string]: any[] } = {};
+
+    // Start fixtures from mid-August
+    const fixtureStartDate = new Date(startDate);
+    fixtureStartDate.setMonth(7); // August
+    fixtureStartDate.setDate(17); // 17th
+    // Find first Saturday
+    while (fixtureStartDate.getDay() !== 6) {
+      fixtureStartDate.setDate(fixtureStartDate.getDate() + 1);
+    }
+
+    for (const competition of this.currentSave.competitions) {
+      if (competition.type === 'LEAGUE') {
+        const fixtures = this.generateLeagueFixtures(
+          competition.id,
+          competition.teamIds,
+          fixtureStartDate.toISOString().split('T')[0]
+        );
+        newFixtures[competition.id] = fixtures;
+      }
+    }
+
+    this.currentSave.fixtures = newFixtures;
+  }
+
+  /**
+   * Generate round-robin fixtures for a league (same algorithm as GenesisLoader)
+   */
+  private generateLeagueFixtures(
+    competitionId: string,
+    teamIds: string[],
+    startDate: string
+  ): any[] {
+    // Shuffle teams for varied matchups
+    const seed = competitionId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) + new Date().getFullYear();
+    const teams = this.shuffleWithSeed([...teamIds], seed);
+    const fixtures: any[] = [];
+
+    // Ensure even number of teams
+    if (teams.length % 2 === 1) {
+      teams.push('BYE');
+    }
+
+    const numTeams = teams.length;
+    const matchesPerRound = numTeams / 2;
+
+    let currentDate = new Date(startDate);
+    let fixtureId = 0;
+
+    // Generate first half (home games)
+    for (let round = 0; round < numTeams - 1; round++) {
+      for (let match = 0; match < matchesPerRound; match++) {
+        const home = (round + match) % (numTeams - 1);
+        let away = (numTeams - 1 - match + round) % (numTeams - 1);
+
+        if (match === 0) {
+          away = numTeams - 1;
+        }
+
+        // Skip BYE matches
+        if (teams[home] === 'BYE' || teams[away] === 'BYE') continue;
+
+        // Alternate home/away for fairness
+        const isHomeFirst = round % 2 === 0;
+        const homeTeam = isHomeFirst ? teams[home] : teams[away];
+        const awayTeam = isHomeFirst ? teams[away] : teams[home];
+
+        fixtures.push({
+          id: `fix_${competitionId}_${Date.now()}_${fixtureId++}`,
+          competitionId,
+          round: round + 1,
+          matchday: round + 1,
+          date: currentDate.toISOString().split('T')[0],
+          homeClubId: homeTeam,
+          awayClubId: awayTeam,
+          status: 'SCHEDULED',
+        });
+      }
+
+      currentDate.setDate(currentDate.getDate() + 7);
+    }
+
+    // Generate second half (reverse fixtures)
+    const firstHalfLength = fixtures.length;
+    for (let i = 0; i < firstHalfLength; i++) {
+      const original = fixtures[i];
+      const reverseMatchday = original.matchday + (numTeams - 1);
+
+      fixtures.push({
+        id: `fix_${competitionId}_${Date.now()}_${fixtureId++}`,
+        competitionId,
+        round: reverseMatchday,
+        matchday: reverseMatchday,
+        date: currentDate.toISOString().split('T')[0],
+        homeClubId: original.awayClubId, // Swapped
+        awayClubId: original.homeClubId,
+        status: 'SCHEDULED',
+      });
+
+      // Advance date every matchesPerRound fixtures
+      if ((i + 1) % (matchesPerRound - (teams.includes('BYE') ? 1 : 0)) === 0) {
+        currentDate.setDate(currentDate.getDate() + 7);
+      }
+    }
+
+    return fixtures;
+  }
+
+  /**
+   * Shuffle array with a seed for reproducibility
+   */
+  private shuffleWithSeed(array: string[], seed: number): string[] {
+    const result = [...array];
+    let currentSeed = seed;
+
+    const random = () => {
+      const x = Math.sin(currentSeed++) * 10000;
+      return x - Math.floor(x);
+    };
+
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+
+    return result;
   }
 
   /**

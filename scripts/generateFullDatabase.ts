@@ -1,5 +1,5 @@
 /**
- * Full Database Generator for Cyberfoot 2026
+ * Full Database Generator for BALONPI 2026
  *
  * Generates a complete database with all leagues, teams, and players.
  * Uses real team names and generates realistic player data.
@@ -548,7 +548,7 @@ function generateManager(teamId: string, country: string): any {
 // ============================================================================
 
 function generateDatabase(): any {
-  console.log('Generating Cyberfoot 2026 Database...\n');
+  console.log('Generating BALONPI 2026 Database...\n');
 
   const database: any = {
     meta: {

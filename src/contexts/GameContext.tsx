@@ -497,9 +497,16 @@ export function GameProvider({ children }: GameProviderProps) {
     if (competitionId && fixtures) {
       const competitionFixtures = fixtures[competitionId];
       if (competitionFixtures) {
-        // Find other fixtures that are SCHEDULED and not the user's match
+        // Find the user's fixture to get the matchday
+        const userFixture = competitionFixtures.find(
+          f => f.homeClubId === homeClubId && f.awayClubId === awayClubId
+        );
+        const currentMatchday = userFixture?.matchday;
+
+        // Find other fixtures that are SCHEDULED, same matchday, and not the user's match
         const otherMatches = competitionFixtures.filter(
           f => f.status === 'SCHEDULED' &&
+               f.matchday === currentMatchday &&
                !(f.homeClubId === homeClubId && f.awayClubId === awayClubId) &&
                !(f.homeClubId === currentSave.userClubId || f.awayClubId === currentSave.userClubId)
         );
@@ -512,9 +519,9 @@ export function GameProvider({ children }: GameProviderProps) {
           const awayPlayers = currentSave.players.filter(p => p.clubId === fixture.awayClubId);
 
           if (homeClub && awayClub && homePlayers.length >= 11 && awayPlayers.length >= 11) {
-            // Create match teams
-            const homeTeam = createMatchTeam(homeClub.id, homeClub.name, homePlayers);
-            const awayTeam = createMatchTeam(awayClub.id, awayClub.name, awayPlayers);
+            // Create match teams (pass current date to filter injured/suspended players)
+            const homeTeam = createMatchTeam(homeClub.id, homeClub.name, homePlayers, '4-3-3', 'BALANCED', currentSave.gameDate);
+            const awayTeam = createMatchTeam(awayClub.id, awayClub.name, awayPlayers, '4-3-3', 'BALANCED', currentSave.gameDate);
 
             // Simulate the match
             const matchResult = simulateMatch(homeTeam, awayTeam);
@@ -575,7 +582,7 @@ export function GameProvider({ children }: GameProviderProps) {
               }
             }
 
-            // Update player stats for goals/assists
+            // Update player stats for all events (goals, assists, cards, injuries)
             for (const event of matchResult.events) {
               if (event.type === 'GOAL') {
                 const scorer = currentSave.players.find(p => p.id === event.playerId);
@@ -588,7 +595,64 @@ export function GameProvider({ children }: GameProviderProps) {
                     assister.currentSeasonStats.assists++;
                   }
                 }
+              } else if (event.type === 'YELLOW') {
+                const player = currentSave.players.find(p => p.id === event.playerId);
+                if (player) {
+                  player.currentSeasonStats.yellowCards++;
+                  // Check for accumulated yellows (5 = 1 match suspension)
+                  if (player.currentSeasonStats.yellowCards % 5 === 0) {
+                    const suspendedDate = new Date(currentSave.gameDate);
+                    suspendedDate.setDate(suspendedDate.getDate() + 7);
+                    player.suspendedUntil = suspendedDate.toISOString().split('T')[0];
+                    player.suspensionReason = 'ACCUMULATED_YELLOWS';
+                  }
+                }
+              } else if (event.type === 'RED') {
+                const player = currentSave.players.find(p => p.id === event.playerId);
+                if (player) {
+                  player.currentSeasonStats.redCards++;
+                  // Suspend for 1 match
+                  const suspendedDate = new Date(currentSave.gameDate);
+                  suspendedDate.setDate(suspendedDate.getDate() + 7);
+                  player.suspendedUntil = suspendedDate.toISOString().split('T')[0];
+                  player.suspensionReason = 'RED_CARD';
+                }
+              } else if (event.type === 'INJURY' && event.injuryWeeks) {
+                const player = currentSave.players.find(p => p.id === event.playerId);
+                if (player) {
+                  const recoveryDate = new Date(currentSave.gameDate);
+                  recoveryDate.setDate(recoveryDate.getDate() + (event.injuryWeeks * 7));
+                  player.injuredUntil = recoveryDate.toISOString().split('T')[0];
+                }
               }
+            }
+
+            // Update appearances for players who played (using lineup from matchResult)
+            const allPlayersInMatch = [
+              ...(matchResult.homeLineup || []),
+              ...(matchResult.awayLineup || []),
+              ...(matchResult.homeSubsIn || []),
+              ...(matchResult.awaySubsIn || []),
+            ];
+            for (const playerId of allPlayersInMatch) {
+              const player = currentSave.players.find(p => p.id === playerId);
+              if (player) {
+                player.currentSeasonStats.appearances++;
+              }
+            }
+
+            // Update clean sheets for goalkeepers
+            if (matchResult.awayScore === 0 && matchResult.homeLineup?.length) {
+              const homeGK = currentSave.players.find(p =>
+                matchResult.homeLineup.includes(p.id) && p.positionMain === 'GK'
+              );
+              if (homeGK) homeGK.currentSeasonStats.cleanSheets++;
+            }
+            if (matchResult.homeScore === 0 && matchResult.awayLineup?.length) {
+              const awayGK = currentSave.players.find(p =>
+                matchResult.awayLineup.includes(p.id) && p.positionMain === 'GK'
+              );
+              if (awayGK) awayGK.currentSeasonStats.cleanSheets++;
             }
 
             // Add to match history

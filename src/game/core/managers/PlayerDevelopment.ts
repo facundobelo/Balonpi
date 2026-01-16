@@ -39,7 +39,7 @@ export function processSeasonDevelopment(players: IPlayer[]): void {
       goals: 0,
       assists: 0,
       cleanSheets: 0,
-      matches: 0,
+      appearances: 0,
       yellowCards: 0,
       redCards: 0,
       avgRating: 0,

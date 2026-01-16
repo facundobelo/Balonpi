@@ -2,7 +2,7 @@
  * MatchdayView - Multi-division matchday display
  *
  * Shows all leagues/divisions simultaneously with live scores,
- * similar to the classic Cyberfoot interface.
+ * similar to the classic BALONPI interface.
  */
 
 import { useGame } from '../../contexts/GameContext';
@@ -197,7 +197,7 @@ function FixtureRow({
   const isHomeUser = fixture.homeClubId === userClubId;
   const isAwayUser = fixture.awayClubId === userClubId;
 
-  // Team colors for Cyberfoot-style display
+  // Team colors for BALONPI-style display
   const getTeamBgColor = (isUser: boolean, isHome: boolean) => {
     if (isUser) return 'bg-[var(--color-accent-green)]';
     if (isHome) return 'bg-[var(--color-accent-blue)]';

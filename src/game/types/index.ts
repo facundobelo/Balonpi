@@ -1,5 +1,5 @@
 // =============================================================================
-// CYBERFOOT 2026 - CORE TYPE DEFINITIONS
+// BALONPI 2026 - CORE TYPE DEFINITIONS
 // =============================================================================
 
 // -----------------------------------------------------------------------------
@@ -46,7 +46,7 @@ export interface PlayerHistoryStats {
   goals: number;
   assists: number;
   cleanSheets: number;
-  matches: number;
+  appearances: number;  // Number of matches played
   yellowCards: number;
   redCards: number;
   avgRating: number;

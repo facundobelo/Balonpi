@@ -1,5 +1,5 @@
 // =============================================================================
-// CYBERFOOT 2026 - PLAYER ENTITY
+// BALONPI 2026 - PLAYER ENTITY
 // =============================================================================
 
 import type {
@@ -447,7 +447,7 @@ export class Player implements IPlayer {
     yellowCard?: boolean;
     redCard?: boolean;
   }): void {
-    this.currentSeasonStats.matches += 1;
+    this.currentSeasonStats.appearances += 1;
     this.currentSeasonStats.goals += stats.goals ?? 0;
     this.currentSeasonStats.assists += stats.assists ?? 0;
     if (stats.cleanSheet) this.currentSeasonStats.cleanSheets += 1;
@@ -455,7 +455,7 @@ export class Player implements IPlayer {
     if (stats.redCard) this.currentSeasonStats.redCards += 1;
 
     // Running average for rating
-    const totalMatches = this.currentSeasonStats.matches;
+    const totalMatches = this.currentSeasonStats.appearances;
     this.currentSeasonStats.avgRating =
       (this.currentSeasonStats.avgRating * (totalMatches - 1) + stats.rating) / totalMatches;
   }
@@ -477,7 +477,7 @@ export class Player implements IPlayer {
       goals: 0,
       assists: 0,
       cleanSheets: 0,
-      matches: 0,
+      appearances: 0,
       yellowCards: 0,
       redCards: 0,
       avgRating: 0,

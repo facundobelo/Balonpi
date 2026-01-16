@@ -1,5 +1,5 @@
 // =============================================================================
-// CYBERFOOT 2026 - MATCH ENGINE
+// BALONPI 2026 - MATCH ENGINE
 // Tick-based probability simulation. No physics, pure math.
 // =============================================================================
 

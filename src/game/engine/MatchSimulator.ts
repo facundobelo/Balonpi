@@ -579,7 +579,8 @@ export function createMatchTeam(
   clubName: string,
   players: any[],
   formation: string = '4-3-3',
-  tactic: 'DEFENSIVE' | 'BALANCED' | 'ATTACKING' = 'BALANCED'
+  tactic: 'DEFENSIVE' | 'BALANCED' | 'ATTACKING' = 'BALANCED',
+  currentDate?: string
 ): MatchTeam {
   // Select best 11 players based on position needs
   const positionNeeds: Record<string, number> = {
@@ -592,12 +593,20 @@ export function createMatchTeam(
 
   const selectedPlayers: MatchPlayer[] = [];
 
-  // Sort players by skill within each position
+  // Filter available players (not injured, not suspended)
+  const isAvailable = (p: any) => {
+    if (!currentDate) return true;
+    if (p.injuredUntil && p.injuredUntil > currentDate) return false;
+    if (p.suspendedUntil && p.suspendedUntil > currentDate) return false;
+    return true;
+  };
+
+  // Sort available players by skill within each position
   const byPosition: Record<string, any[]> = {
-    GK: players.filter(p => p.positionMain === 'GK').sort((a, b) => b.skillBase - a.skillBase),
-    DEF: players.filter(p => p.positionMain === 'DEF').sort((a, b) => b.skillBase - a.skillBase),
-    MID: players.filter(p => p.positionMain === 'MID').sort((a, b) => b.skillBase - a.skillBase),
-    FWD: players.filter(p => p.positionMain === 'FWD').sort((a, b) => b.skillBase - a.skillBase),
+    GK: players.filter(p => p.positionMain === 'GK' && isAvailable(p)).sort((a, b) => b.skillBase - a.skillBase),
+    DEF: players.filter(p => p.positionMain === 'DEF' && isAvailable(p)).sort((a, b) => b.skillBase - a.skillBase),
+    MID: players.filter(p => p.positionMain === 'MID' && isAvailable(p)).sort((a, b) => b.skillBase - a.skillBase),
+    FWD: players.filter(p => p.positionMain === 'FWD' && isAvailable(p)).sort((a, b) => b.skillBase - a.skillBase),
   };
 
   // Select players for each position

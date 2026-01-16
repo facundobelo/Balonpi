@@ -129,7 +129,7 @@ export const useGameStore = create<GameState>()(
       },
     }),
     {
-      name: 'cyberfoot-game-state',
+      name: 'balonpi-game-state',
       partialize: (state) => ({
         userCareer: state.userCareer,
         userClubId: state.userClubId,

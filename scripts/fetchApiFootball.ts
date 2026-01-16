@@ -560,7 +560,7 @@ async function fetchCoachForTeam(teamId: number): Promise<any | null> {
 // Main execution
 async function main() {
   console.log('═'.repeat(60));
-  console.log('  API-Football Data Fetcher for Cyberfoot 2026');
+  console.log('  API-Football Data Fetcher for BALONPI 2026');
   console.log('═'.repeat(60));
 
   if (!API_KEY) {

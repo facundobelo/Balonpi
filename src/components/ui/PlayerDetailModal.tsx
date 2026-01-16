@@ -87,7 +87,7 @@ function getPotentialGap(skill: number, potential: number): { label: string; col
 function calculateMood(player: IPlayer): PlayerMood {
   // Simple mood calculation based on playing time and contract
   const stats = player.currentSeasonStats;
-  const matchesPlayed = stats?.matches || 0;
+  const matchesPlayed = stats?.appearances || 0;
 
   // Players who play regularly are happier
   if (matchesPlayed >= 15) return 'HAPPY';
@@ -244,14 +244,14 @@ export function PlayerDetailModal({
           </div>
 
           {/* Season Stats */}
-          {stats && (stats.matches > 0 || isOwnTeam) && (
+          {stats && (stats.appearances > 0 || isOwnTeam) && (
             <div className="bg-[var(--color-bg-tertiary)] rounded-xl p-3">
               <div className="text-xs font-semibold text-[var(--color-text-secondary)] mb-2">
                 TEMPORADA ACTUAL
               </div>
               <div className="grid grid-cols-4 gap-2 text-center">
                 <div>
-                  <div className="text-lg font-bold">{stats.matches}</div>
+                  <div className="text-lg font-bold">{stats.appearances}</div>
                   <div className="text-[9px] text-[var(--color-text-secondary)]">PJ</div>
                 </div>
                 <div>

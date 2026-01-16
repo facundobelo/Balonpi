@@ -2,7 +2,7 @@
  * AllStandingsView - Multi-division standings display
  *
  * Shows all leagues/divisions standings simultaneously in a grid,
- * similar to the classic Cyberfoot interface.
+ * similar to the classic BALONPI interface.
  */
 
 import { useGame } from '../../contexts/GameContext';

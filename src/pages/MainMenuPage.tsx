@@ -41,7 +41,7 @@ export function MainMenuPage() {
       {/* Logo */}
       <div className="mb-12 text-center">
         <h1 className="text-4xl font-bold text-[var(--color-accent-green)] tracking-tight">
-          CYBERFOOT
+          BALONPI
         </h1>
         <div className="text-[var(--color-text-secondary)] text-sm font-mono mt-1">2026</div>
       </div>

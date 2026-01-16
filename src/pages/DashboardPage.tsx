@@ -1,5 +1,5 @@
 /**
- * DashboardPage - Main game view (World-class Cyberfoot-style)
+ * DashboardPage - Main game view (World-class BALONPI-style)
  *
  * Shows all divisions simultaneously with matchday fixtures,
  * user's match highlighted, and quick access to play.
