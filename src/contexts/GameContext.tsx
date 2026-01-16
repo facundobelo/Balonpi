@@ -11,6 +11,7 @@ import {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   type ReactNode,
 } from 'react';
 import { saveManager, type GameSave, type SaveSlot, type MatchResult, type NewsItem } from '../game/storage/SaveManager';
@@ -101,6 +102,10 @@ interface GameContextValue {
   showSeasonSummary: boolean;
   setShowSeasonSummary: (show: boolean) => void;
   startNewSeason: () => void;
+
+  // Transfer offers from CPU
+  pendingOffers: any[];
+  respondToOffer: (offerId: string, accept: boolean) => void;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -706,6 +711,66 @@ export function GameProvider({ children }: GameProviderProps) {
     const currentDate = new Date(currentSave.gameDate);
     currentDate.setDate(currentDate.getDate() + 7);
     currentSave.gameDate = currentDate.toISOString().split('T')[0];
+
+    // Generate CPU transfer offers for listed players (during transfer window)
+    const month = currentDate.getMonth();
+    const isWindowOpen = month === 6 || month === 7 || month === 0; // July, August, January
+    if (isWindowOpen) {
+      // Initialize if doesn't exist
+      if (!currentSave.receivedOffers) currentSave.receivedOffers = [];
+
+      // Find user's listed players
+      const userSquad = currentSave.players.filter(p => p.clubId === currentSave.userClubId);
+      const listedPlayers = userSquad.filter(p => p.transferStatus === 'LISTED' || p.transferStatus === 'LOAN_LISTED');
+
+      // 15% chance per listed player to receive an offer per matchday
+      for (const player of listedPlayers) {
+        // Check if already has pending offer
+        const hasPendingOffer = currentSave.receivedOffers.some(
+          o => o.playerId === player.id && o.status === 'PENDING' && o.expiresDate >= currentSave.gameDate
+        );
+        if (hasPendingOffer) continue;
+
+        if (Math.random() < 0.15) {
+          // Find a CPU club that can afford the player
+          const potentialBuyers = currentSave.clubs.filter(c => {
+            if (c.id === currentSave.userClubId) return false;
+            if (c.isNationalTeam) return false;
+            const budget = c.budget ?? c.balance ?? 0;
+            return budget >= player.marketValue * 0.7;
+          });
+
+          if (potentialBuyers.length > 0) {
+            const buyer = potentialBuyers[Math.floor(Math.random() * potentialBuyers.length)];
+            // Offer between 70% and 110% of market value
+            const offerMultiplier = 0.7 + Math.random() * 0.4;
+            const offerAmount = Math.round(player.marketValue * offerMultiplier / 10000) * 10000;
+
+            const expiryDate = new Date(currentSave.gameDate);
+            expiryDate.setDate(expiryDate.getDate() + 14); // Offer valid for 2 weeks
+
+            currentSave.receivedOffers.push({
+              id: `offer_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              playerId: player.id,
+              fromClubId: buyer.id,
+              amount: offerAmount,
+              createdDate: currentSave.gameDate,
+              expiresDate: expiryDate.toISOString().split('T')[0],
+              status: 'PENDING',
+            });
+
+            // Add news about the offer
+            currentSave.newsItems.unshift(createNewsItem(
+              'TRANSFER',
+              `${buyer.name} interesado en ${player.name}`,
+              `${buyer.name} ha enviado una oferta de ${formatCurrency(offerAmount)} por ${player.name}.`,
+              currentSave.gameDate,
+              [player.id, buyer.id]
+            ));
+          }
+        }
+      }
+    }
 
     // Check if season should end (all league fixtures finished)
     if (saveManager.isSeasonComplete()) {
@@ -1341,6 +1406,72 @@ export function GameProvider({ children }: GameProviderProps) {
     setShowSeasonSummary(false);
   }, []);
 
+  // Get pending offers (filter expired ones)
+  const pendingOffers = useMemo(() => {
+    if (!currentSave) return [];
+    // Initialize receivedOffers if it doesn't exist (for legacy saves)
+    const offers = currentSave.receivedOffers || [];
+    return offers.filter(o =>
+      o.status === 'PENDING' && o.expiresDate >= currentSave.gameDate
+    );
+  }, [currentSave]);
+
+  // Respond to a transfer offer
+  const respondToOffer = useCallback((offerId: string, accept: boolean) => {
+    if (!currentSave) return;
+
+    // Initialize if doesn't exist
+    if (!currentSave.receivedOffers) currentSave.receivedOffers = [];
+
+    const offer = currentSave.receivedOffers.find(o => o.id === offerId);
+    if (!offer || offer.status !== 'PENDING') return;
+
+    if (accept) {
+      const player = currentSave.players.find(p => p.id === offer.playerId);
+      const userClub = currentSave.clubs.find(c => c.id === currentSave.userClubId);
+      const buyerClub = currentSave.clubs.find(c => c.id === offer.fromClubId);
+
+      if (player && userClub && buyerClub) {
+        // Transfer the player
+        player.clubId = buyerClub.id;
+        player.transferStatus = 'AVAILABLE';
+
+        // Update finances
+        if (userClub.budget === undefined) userClub.budget = userClub.balance || 0;
+        if (buyerClub.budget === undefined) buyerClub.budget = buyerClub.balance || 0;
+        userClub.budget += offer.amount;
+        buyerClub.budget -= offer.amount;
+
+        // Add to transfer history
+        currentSave.transferHistory.push({
+          id: `transfer_${Date.now()}`,
+          date: currentSave.gameDate,
+          playerId: player.id,
+          fromClubId: userClub.id,
+          toClubId: buyerClub.id,
+          fee: offer.amount,
+          type: 'TRANSFER',
+        });
+
+        // Add news
+        currentSave.newsItems.unshift(createNewsItem(
+          'TRANSFER',
+          `${player.name} vendido a ${buyerClub.name}`,
+          `${userClub.name} acepta la oferta de ${formatCurrency(offer.amount)} por ${player.name}.`,
+          currentSave.gameDate,
+          [player.id, buyerClub.id]
+        ));
+
+        offer.status = 'ACCEPTED';
+      }
+    } else {
+      offer.status = 'REJECTED';
+    }
+
+    saveManager.scheduleAutoSave();
+    setCurrentSave({ ...currentSave });
+  }, [currentSave]);
+
   const value: GameContextValue = {
     isInitialized,
     isLoading,
@@ -1372,6 +1503,8 @@ export function GameProvider({ children }: GameProviderProps) {
     showSeasonSummary,
     setShowSeasonSummary,
     startNewSeason,
+    pendingOffers,
+    respondToOffer,
   };
 
   return (

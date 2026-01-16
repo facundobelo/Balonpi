@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useGame } from '../contexts/GameContext';
 
 function formatCurrency(value: number): string {
@@ -11,6 +11,8 @@ function formatCurrency(value: number): string {
 export function OfficePage() {
   const { currentSave, getUserClub, exitToMenu } = useGame();
   const [showConfirmExit, setShowConfirmExit] = useState(false);
+  const [showVacantJobs, setShowVacantJobs] = useState(false);
+  const [applyingTo, setApplyingTo] = useState<string | null>(null);
 
   const userClub = getUserClub();
 
@@ -61,6 +63,39 @@ export function OfficePage() {
   // Board objectives
   const boardObjectives = currentSave.boardObjectives;
   const boardConfidence = boardObjectives?.boardConfidence || 70;
+
+  // Manager reputation
+  const managerReputation = currentSave.managerReputation || 30;
+
+  // Find vacant positions (clubs without managers - simulate with random vacancies)
+  // In a real implementation, clubs would have a managerId field
+  const vacantJobs = useMemo(() => {
+    // Get all clubs that are NOT the user's club and in a league
+    const eligibleClubs = currentSave.clubs
+      .filter(c => c.id !== userClub.id && !c.isNationalTeam && c.leagueId);
+
+    // Simulate vacancies - about 5-10% of clubs have vacancies
+    // Use a deterministic "random" based on game date for consistency
+    const dateHash = currentSave.gameDate.split('-').reduce((acc, val) => acc + parseInt(val), 0);
+
+    return eligibleClubs
+      .filter((_, index) => (index + dateHash) % 12 === 0) // ~8% of clubs
+      .map(club => {
+        // Calculate if user can apply based on reputation
+        const repDiff = club.reputation - managerReputation;
+        const canApply = repDiff <= 15; // Can apply if club rep is at most 15 higher
+        const successChance = canApply
+          ? Math.min(90, Math.max(10, 50 - repDiff * 3 + (wins * 2)))
+          : 0;
+
+        return {
+          club,
+          canApply,
+          successChance,
+        };
+      })
+      .sort((a, b) => b.club.reputation - a.club.reputation);
+  }, [currentSave.clubs, currentSave.gameDate, userClub.id, managerReputation, wins]);
 
   // Get confidence color
   const getConfidenceColor = (conf: number) => {
@@ -317,6 +352,136 @@ export function OfficePage() {
           </div>
         </div>
       )}
+
+      {/* Vacant Positions Button */}
+      <div className="card mb-4">
+        <button
+          onClick={() => setShowVacantJobs(!showVacantJobs)}
+          className="w-full flex items-center justify-between"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-xl">💼</span>
+            <div className="text-left">
+              <div className="font-semibold">Posiciones Vacantes</div>
+              <div className="text-xs text-[var(--color-text-secondary)]">
+                {vacantJobs.length} ofertas disponibles
+              </div>
+            </div>
+          </div>
+          <span className={`transition-transform ${showVacantJobs ? 'rotate-180' : ''}`}>▼</span>
+        </button>
+
+        {showVacantJobs && (
+          <div className="mt-4 space-y-2">
+            {vacantJobs.length === 0 ? (
+              <div className="text-center text-sm text-[var(--color-text-secondary)] py-4">
+                No hay posiciones vacantes en este momento
+              </div>
+            ) : (
+              vacantJobs.map(({ club, canApply, successChance }) => {
+                const league = currentSave.competitions.find(c => c.id === club.leagueId);
+                return (
+                  <div
+                    key={club.id}
+                    className={`p-3 rounded-lg border ${
+                      canApply
+                        ? 'bg-[var(--color-bg-tertiary)] border-[var(--color-border)]'
+                        : 'bg-[var(--color-bg-tertiary)]/50 border-[var(--color-border)]/50 opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="font-semibold">{club.name}</div>
+                        <div className="text-xs text-[var(--color-text-secondary)]">
+                          {league?.name || 'Liga'} · Rep: {club.reputation}
+                        </div>
+                        <div className="text-xs text-[var(--color-text-secondary)] mt-1">
+                          Presupuesto: {formatCurrency(club.budget || club.balance || 0)}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        {canApply ? (
+                          <>
+                            <div className="text-xs text-[var(--color-text-secondary)]">
+                              Prob. éxito: <span className={`font-bold ${
+                                successChance >= 50 ? 'text-[var(--color-accent-green)]' :
+                                successChance >= 30 ? 'text-[var(--color-accent-yellow)]' :
+                                'text-[var(--color-accent-red)]'
+                              }`}>{successChance}%</span>
+                            </div>
+                            <button
+                              onClick={() => setApplyingTo(club.id)}
+                              className="mt-2 btn btn-sm bg-[var(--color-accent-green)] text-black font-bold"
+                            >
+                              Postularse
+                            </button>
+                          </>
+                        ) : (
+                          <div className="text-xs text-[var(--color-accent-red)]">
+                            Reputación insuficiente
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div className="text-center text-xs text-[var(--color-text-secondary)] mt-2 pt-2 border-t border-[var(--color-border)]">
+              Tu reputación: <span className="font-bold">{managerReputation}</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Apply Confirmation Modal */}
+      {applyingTo && (() => {
+        const job = vacantJobs.find(j => j.club.id === applyingTo);
+        if (!job) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+            <div className="bg-[var(--color-bg-card)] rounded-xl w-full max-w-sm p-6">
+              <h2 className="text-lg font-bold mb-4 text-center">Postularse a {job.club.name}</h2>
+              <p className="text-sm text-[var(--color-text-secondary)] text-center mb-4">
+                ¿Estás seguro de que quieres postularte? Si te eligen, dejarás tu club actual.
+              </p>
+              <div className="text-center mb-4">
+                <span className="text-xs text-[var(--color-text-secondary)]">Probabilidad de éxito: </span>
+                <span className={`font-bold ${
+                  job.successChance >= 50 ? 'text-[var(--color-accent-green)]' :
+                  job.successChance >= 30 ? 'text-[var(--color-accent-yellow)]' :
+                  'text-[var(--color-accent-red)]'
+                }`}>{job.successChance}%</span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setApplyingTo(null)}
+                  className="btn btn-ghost flex-1"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    // Simulate the application result
+                    const roll = Math.random() * 100;
+                    if (roll < job.successChance) {
+                      // Success! This would need a proper implementation to change clubs
+                      alert(`¡Felicidades! ${job.club.name} te ha contratado como nuevo entrenador.`);
+                      // TODO: Implement club change logic
+                    } else {
+                      alert(`${job.club.name} ha rechazado tu postulación. Sigue intentando.`);
+                    }
+                    setApplyingTo(null);
+                  }}
+                  className="btn bg-[var(--color-accent-green)] text-black font-bold flex-1"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Exit Button */}
       <div className="mt-6">

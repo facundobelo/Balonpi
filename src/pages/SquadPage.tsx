@@ -308,15 +308,19 @@ function SwipeablePlayerCard({ player, isInXI, onTap, onStatusChange }: Swipeabl
 type ViewMode = 'formation' | 'list';
 
 export function SquadPage() {
-  const { currentSave, getUserClub, getUserSquad, updatePlayerTransferStatus } = useGame();
+  const { currentSave, getUserClub, getUserSquad, updatePlayerTransferStatus, pendingOffers, respondToOffer } = useGame();
   const [viewMode, setViewMode] = useState<ViewMode>('formation');
   const [formation, setFormation] = useState('4-3-3');
   const [filterPosition, setFilterPosition] = useState<Position | 'ALL'>('ALL');
   const [selectedPlayer, setSelectedPlayer] = useState<IPlayer | null>(null);
   const [selectedLineup, setSelectedLineup] = useState<string[]>([]);
+  const [showOffers, setShowOffers] = useState(false);
 
   const club = getUserClub();
   const players = getUserSquad();
+
+  // Get offers for user's players
+  const playerOffers = pendingOffers || [];
 
   // Auto-select best XI on first render
   useMemo(() => {
@@ -441,9 +445,23 @@ export function SquadPage() {
               <span className="font-mono">Media: {avgSkill}</span>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-xs text-[var(--color-text-secondary)]">{currentSave.season}</div>
-            <div className="text-sm font-mono text-[var(--color-accent-green)]">{currentSave.gameDate}</div>
+          <div className="flex items-start gap-3">
+            {/* Offers notification */}
+            {playerOffers.length > 0 && (
+              <button
+                onClick={() => setShowOffers(true)}
+                className="relative p-2 bg-[var(--color-accent-yellow)]/20 rounded-lg border border-[var(--color-accent-yellow)]/30"
+              >
+                <span className="text-lg">📩</span>
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[var(--color-accent-red)] rounded-full flex items-center justify-center text-[10px] font-bold text-white">
+                  {playerOffers.length}
+                </span>
+              </button>
+            )}
+            <div className="text-right">
+              <div className="text-xs text-[var(--color-text-secondary)]">{currentSave.season}</div>
+              <div className="text-sm font-mono text-[var(--color-accent-green)]">{currentSave.gameDate}</div>
+            </div>
           </div>
         </div>
 
@@ -706,6 +724,79 @@ export function SquadPage() {
             }
           }}
         />
+      )}
+
+      {/* Transfer Offers Modal */}
+      {showOffers && playerOffers.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="bg-[var(--color-bg-card)] rounded-2xl w-full max-w-md max-h-[80vh] overflow-hidden">
+            <div className="p-4 border-b border-[var(--color-border)] flex justify-between items-center">
+              <h2 className="text-lg font-bold">Ofertas Recibidas</h2>
+              <button
+                onClick={() => setShowOffers(false)}
+                className="text-[var(--color-text-secondary)] hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 space-y-3 overflow-y-auto max-h-[60vh]">
+              {playerOffers.map((offer) => {
+                const player = players.find(p => p.id === offer.playerId);
+                const buyerClub = currentSave?.clubs.find(c => c.id === offer.fromClubId);
+                if (!player || !buyerClub) return null;
+
+                const isGoodDeal = offer.amount >= player.marketValue;
+                const percentOfValue = Math.round((offer.amount / player.marketValue) * 100);
+
+                return (
+                  <div key={offer.id} className="p-4 bg-[var(--color-bg-tertiary)] rounded-xl">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="font-semibold">{player.name}</div>
+                        <div className="text-xs text-[var(--color-text-secondary)]">
+                          Oferta de {buyerClub.name}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className={`font-mono font-bold ${isGoodDeal ? 'text-[var(--color-accent-green)]' : 'text-[var(--color-accent-yellow)]'}`}>
+                          {formatCurrency(offer.amount)}
+                        </div>
+                        <div className="text-[10px] text-[var(--color-text-secondary)]">
+                          {percentOfValue}% del valor
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-xs text-[var(--color-text-secondary)] mb-3">
+                      Valor de mercado: {formatCurrency(player.marketValue)}
+                      <br />
+                      Expira: {offer.expiresDate}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          respondToOffer(offer.id, false);
+                          if (playerOffers.length === 1) setShowOffers(false);
+                        }}
+                        className="btn btn-ghost flex-1 border border-[var(--color-border)]"
+                      >
+                        Rechazar
+                      </button>
+                      <button
+                        onClick={() => {
+                          respondToOffer(offer.id, true);
+                          if (playerOffers.length === 1) setShowOffers(false);
+                        }}
+                        className="btn bg-[var(--color-accent-green)] text-black font-bold flex-1"
+                      >
+                        Aceptar
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

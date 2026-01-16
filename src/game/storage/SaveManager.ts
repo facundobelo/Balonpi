@@ -49,6 +49,19 @@ export interface GameSave {
 
   // Manager career stats
   managerReputation: number;  // 0-100
+
+  // Transfer offers received from CPU clubs for user's players
+  receivedOffers: ReceivedOffer[];
+}
+
+export interface ReceivedOffer {
+  id: string;
+  playerId: string;
+  fromClubId: string;
+  amount: number;
+  createdDate: string;
+  expiresDate: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
 }
 
 export interface MatchResult {
@@ -246,6 +259,7 @@ class SaveManager {
       matchHistory: [],
       transferHistory: [],
       newsItems: [],
+      receivedOffers: [],
 
       // Season fixtures
       fixtures: seasonFixtures ? JSON.parse(JSON.stringify(seasonFixtures)) : {},
