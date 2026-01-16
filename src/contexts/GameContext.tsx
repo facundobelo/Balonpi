@@ -92,6 +92,9 @@ interface GameContextValue {
     message: string;
   };
   sellPlayer: (playerId: string, buyerClubId: string, amount: number) => boolean;
+
+  // Simulate to matchday (auto-simulate user matches)
+  simulateToMatchday: (targetMatchday: number, leagueId: string) => void;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -1031,6 +1034,272 @@ export function GameProvider({ children }: GameProviderProps) {
     return true;
   }, [currentSave]);
 
+  // Simulate to a specific matchday - auto-simulate user matches
+  const simulateToMatchday = useCallback((targetMatchday: number, leagueId: string) => {
+    if (!currentSave || !fixtures) return;
+
+    const leagueFixtures = fixtures[leagueId];
+    if (!leagueFixtures) return;
+
+    const userClubId = currentSave.userClubId;
+    const competition = currentSave.competitions.find(c => c.id === leagueId);
+
+    // Find user fixtures that need to be simulated (up to target matchday)
+    const userFixturesToSimulate = leagueFixtures.filter(
+      f => f.status === 'SCHEDULED' &&
+           f.matchday <= targetMatchday &&
+           (f.homeClubId === userClubId || f.awayClubId === userClubId)
+    ).sort((a, b) => a.matchday - b.matchday);
+
+    if (userFixturesToSimulate.length === 0) return;
+
+    // Simulate each user match
+    for (const fixture of userFixturesToSimulate) {
+      const homeClub = currentSave.clubs.find(c => c.id === fixture.homeClubId);
+      const awayClub = currentSave.clubs.find(c => c.id === fixture.awayClubId);
+      const homePlayers = currentSave.players.filter(p => p.clubId === fixture.homeClubId);
+      const awayPlayers = currentSave.players.filter(p => p.clubId === fixture.awayClubId);
+
+      // Filter available players
+      const isPlayerAvailable = (p: any) => {
+        if (p.injuredUntil && p.injuredUntil > currentSave.gameDate) return false;
+        if (p.suspendedUntil && p.suspendedUntil > currentSave.gameDate) return false;
+        return true;
+      };
+      const availableHomePlayers = homePlayers.filter(isPlayerAvailable);
+      const availableAwayPlayers = awayPlayers.filter(isPlayerAvailable);
+
+      if (homeClub && awayClub && availableHomePlayers.length >= 11 && availableAwayPlayers.length >= 11) {
+        const homeTeam = createMatchTeam(homeClub.id, homeClub.name, availableHomePlayers, '4-3-3', 'BALANCED', currentSave.gameDate);
+        const awayTeam = createMatchTeam(awayClub.id, awayClub.name, availableAwayPlayers, '4-3-3', 'BALANCED', currentSave.gameDate);
+
+        const matchResult = simulateMatch(homeTeam, awayTeam);
+
+        // Update fixture
+        const fixtureIndex = leagueFixtures.findIndex(
+          f => f.homeClubId === fixture.homeClubId && f.awayClubId === fixture.awayClubId && f.matchday === fixture.matchday
+        );
+        if (fixtureIndex !== -1) {
+          leagueFixtures[fixtureIndex] = {
+            ...leagueFixtures[fixtureIndex],
+            status: 'FINISHED',
+            homeScore: matchResult.homeScore,
+            awayScore: matchResult.awayScore,
+          };
+        }
+
+        // Update standings
+        if (competition?.standings) {
+          const homeStanding = competition.standings.find((s: any) => s.clubId === fixture.homeClubId);
+          const awayStanding = competition.standings.find((s: any) => s.clubId === fixture.awayClubId);
+
+          if (homeStanding) {
+            homeStanding.played++;
+            homeStanding.goalsFor += matchResult.homeScore;
+            homeStanding.goalsAgainst += matchResult.awayScore;
+            if (matchResult.homeScore > matchResult.awayScore) {
+              homeStanding.won++;
+              homeStanding.points += 3;
+              homeStanding.form = ['W', ...homeStanding.form.slice(0, 4)];
+            } else if (matchResult.homeScore < matchResult.awayScore) {
+              homeStanding.lost++;
+              homeStanding.form = ['L', ...homeStanding.form.slice(0, 4)];
+            } else {
+              homeStanding.drawn++;
+              homeStanding.points += 1;
+              homeStanding.form = ['D', ...homeStanding.form.slice(0, 4)];
+            }
+          }
+
+          if (awayStanding) {
+            awayStanding.played++;
+            awayStanding.goalsFor += matchResult.awayScore;
+            awayStanding.goalsAgainst += matchResult.homeScore;
+            if (matchResult.awayScore > matchResult.homeScore) {
+              awayStanding.won++;
+              awayStanding.points += 3;
+              awayStanding.form = ['W', ...awayStanding.form.slice(0, 4)];
+            } else if (matchResult.awayScore < matchResult.homeScore) {
+              awayStanding.lost++;
+              awayStanding.form = ['L', ...awayStanding.form.slice(0, 4)];
+            } else {
+              awayStanding.drawn++;
+              awayStanding.points += 1;
+              awayStanding.form = ['D', ...awayStanding.form.slice(0, 4)];
+            }
+          }
+        }
+
+        // Update player stats
+        for (const event of matchResult.events) {
+          if (event.type === 'GOAL') {
+            const scorer = currentSave.players.find(p => p.id === event.playerId);
+            if (scorer) scorer.currentSeasonStats.goals++;
+            if (event.assistPlayerId) {
+              const assister = currentSave.players.find(p => p.id === event.assistPlayerId);
+              if (assister) assister.currentSeasonStats.assists++;
+            }
+          } else if (event.type === 'YELLOW') {
+            const player = currentSave.players.find(p => p.id === event.playerId);
+            if (player) player.currentSeasonStats.yellowCards++;
+          } else if (event.type === 'RED') {
+            const player = currentSave.players.find(p => p.id === event.playerId);
+            if (player) player.currentSeasonStats.redCards++;
+          }
+        }
+
+        // Update appearances
+        const allPlayersInMatch = [
+          ...(matchResult.homeLineup || []),
+          ...(matchResult.awayLineup || []),
+          ...(matchResult.homeSubsIn || []),
+          ...(matchResult.awaySubsIn || []),
+        ];
+        for (const playerId of allPlayersInMatch) {
+          const player = currentSave.players.find(p => p.id === playerId);
+          if (player) player.currentSeasonStats.appearances++;
+        }
+
+        // Add to match history
+        if (currentSave.matchHistory.length < 500) {
+          currentSave.matchHistory.push({
+            id: `match_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            date: fixture.date || currentSave.gameDate,
+            competitionId: leagueId,
+            homeClubId: fixture.homeClubId,
+            awayClubId: fixture.awayClubId,
+            homeScore: matchResult.homeScore,
+            awayScore: matchResult.awayScore,
+            events: matchResult.events.map(e => ({
+              minute: e.minute,
+              type: e.type as 'GOAL' | 'ASSIST' | 'YELLOW' | 'RED' | 'SUB',
+              playerId: e.playerId,
+              clubId: e.teamIndex === 0 ? fixture.homeClubId : fixture.awayClubId,
+              assistPlayerId: e.assistPlayerId,
+            })),
+          });
+        }
+
+        // Simulate all other matches for this matchday (CPU vs CPU)
+        for (const [otherLeagueId, otherLeagueFixtures] of Object.entries(fixtures)) {
+          if (!otherLeagueFixtures) continue;
+          const otherComp = currentSave.competitions.find(c => c.id === otherLeagueId);
+          const cpuMatches = otherLeagueFixtures.filter(
+            f => f.status === 'SCHEDULED' &&
+                 f.matchday === fixture.matchday &&
+                 f.homeClubId !== userClubId &&
+                 f.awayClubId !== userClubId
+          );
+
+          for (const cpuFixture of cpuMatches) {
+            const cpuHomeClub = currentSave.clubs.find(c => c.id === cpuFixture.homeClubId);
+            const cpuAwayClub = currentSave.clubs.find(c => c.id === cpuFixture.awayClubId);
+            const cpuHomePlayers = currentSave.players.filter(p => p.clubId === cpuFixture.homeClubId);
+            const cpuAwayPlayers = currentSave.players.filter(p => p.clubId === cpuFixture.awayClubId);
+
+            const availableCpuHome = cpuHomePlayers.filter(isPlayerAvailable);
+            const availableCpuAway = cpuAwayPlayers.filter(isPlayerAvailable);
+
+            if (cpuHomeClub && cpuAwayClub && availableCpuHome.length >= 11 && availableCpuAway.length >= 11) {
+              const cpuHomeTeam = createMatchTeam(cpuHomeClub.id, cpuHomeClub.name, availableCpuHome, '4-3-3', 'BALANCED', currentSave.gameDate);
+              const cpuAwayTeam = createMatchTeam(cpuAwayClub.id, cpuAwayClub.name, availableCpuAway, '4-3-3', 'BALANCED', currentSave.gameDate);
+              const cpuResult = simulateMatch(cpuHomeTeam, cpuAwayTeam);
+
+              // Update CPU fixture
+              const cpuFixtureIndex = otherLeagueFixtures.findIndex(
+                f => f.homeClubId === cpuFixture.homeClubId && f.awayClubId === cpuFixture.awayClubId && f.matchday === cpuFixture.matchday
+              );
+              if (cpuFixtureIndex !== -1) {
+                otherLeagueFixtures[cpuFixtureIndex] = {
+                  ...otherLeagueFixtures[cpuFixtureIndex],
+                  status: 'FINISHED',
+                  homeScore: cpuResult.homeScore,
+                  awayScore: cpuResult.awayScore,
+                };
+              }
+
+              // Update CPU standings
+              if (otherComp?.standings) {
+                const cpuHomeStanding = otherComp.standings.find((s: any) => s.clubId === cpuFixture.homeClubId);
+                const cpuAwayStanding = otherComp.standings.find((s: any) => s.clubId === cpuFixture.awayClubId);
+
+                if (cpuHomeStanding) {
+                  cpuHomeStanding.played++;
+                  cpuHomeStanding.goalsFor += cpuResult.homeScore;
+                  cpuHomeStanding.goalsAgainst += cpuResult.awayScore;
+                  if (cpuResult.homeScore > cpuResult.awayScore) {
+                    cpuHomeStanding.won++;
+                    cpuHomeStanding.points += 3;
+                    cpuHomeStanding.form = ['W', ...cpuHomeStanding.form.slice(0, 4)];
+                  } else if (cpuResult.homeScore < cpuResult.awayScore) {
+                    cpuHomeStanding.lost++;
+                    cpuHomeStanding.form = ['L', ...cpuHomeStanding.form.slice(0, 4)];
+                  } else {
+                    cpuHomeStanding.drawn++;
+                    cpuHomeStanding.points += 1;
+                    cpuHomeStanding.form = ['D', ...cpuHomeStanding.form.slice(0, 4)];
+                  }
+                }
+
+                if (cpuAwayStanding) {
+                  cpuAwayStanding.played++;
+                  cpuAwayStanding.goalsFor += cpuResult.awayScore;
+                  cpuAwayStanding.goalsAgainst += cpuResult.homeScore;
+                  if (cpuResult.awayScore > cpuResult.homeScore) {
+                    cpuAwayStanding.won++;
+                    cpuAwayStanding.points += 3;
+                    cpuAwayStanding.form = ['W', ...cpuAwayStanding.form.slice(0, 4)];
+                  } else if (cpuResult.awayScore < cpuResult.homeScore) {
+                    cpuAwayStanding.lost++;
+                    cpuAwayStanding.form = ['L', ...cpuAwayStanding.form.slice(0, 4)];
+                  } else {
+                    cpuAwayStanding.drawn++;
+                    cpuAwayStanding.points += 1;
+                    cpuAwayStanding.form = ['D', ...cpuAwayStanding.form.slice(0, 4)];
+                  }
+                }
+              }
+
+              // Update CPU player stats
+              for (const event of cpuResult.events) {
+                if (event.type === 'GOAL') {
+                  const scorer = currentSave.players.find(p => p.id === event.playerId);
+                  if (scorer) scorer.currentSeasonStats.goals++;
+                  if (event.assistPlayerId) {
+                    const assister = currentSave.players.find(p => p.id === event.assistPlayerId);
+                    if (assister) assister.currentSeasonStats.assists++;
+                  }
+                }
+              }
+
+              // Update CPU appearances
+              const cpuPlayersInMatch = [
+                ...(cpuResult.homeLineup || []),
+                ...(cpuResult.awayLineup || []),
+              ];
+              for (const playerId of cpuPlayersInMatch) {
+                const player = currentSave.players.find(p => p.id === playerId);
+                if (player) player.currentSeasonStats.appearances++;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Update date to match the target matchday date
+    const lastSimulatedFixture = userFixturesToSimulate[userFixturesToSimulate.length - 1];
+    if (lastSimulatedFixture?.date) {
+      currentSave.gameDate = lastSimulatedFixture.date;
+    }
+
+    // Update fixtures and save
+    currentSave.fixtures = { ...fixtures };
+    setFixtures({ ...fixtures });
+    saveManager.scheduleAutoSave();
+    setCurrentSave({ ...currentSave });
+  }, [currentSave, fixtures]);
+
   const value: GameContextValue = {
     isInitialized,
     isLoading,
@@ -1057,6 +1326,7 @@ export function GameProvider({ children }: GameProviderProps) {
     updatePlayerTransferStatus,
     makeTransferOffer,
     sellPlayer,
+    simulateToMatchday,
   };
 
   return (

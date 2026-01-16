@@ -209,7 +209,7 @@ export function OfficePage() {
 
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-[var(--color-text-secondary)]">
-                      Progreso: <span className="font-mono font-bold text-white">{getObjectiveProgress(obj)}</span>
+                      Situación actual: <span className="font-mono font-bold text-white">{getObjectiveProgress(obj)}</span>
                     </span>
                     {obj.reward && (
                       <span className="text-[var(--color-accent-green)]">
@@ -255,7 +255,7 @@ export function OfficePage() {
         <div className="card p-3">
           <div className="text-[var(--color-text-secondary)] text-xs mb-1">Presupuesto</div>
           <div className="font-mono text-lg font-bold text-[var(--color-accent-green)]">
-            {formatCurrency(userClub.budget)}
+            {formatCurrency(userClub.budget || 0)}
           </div>
         </div>
       </div>

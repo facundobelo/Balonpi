@@ -183,7 +183,26 @@ function SwipeablePlayerCard({ player, isInXI, onTap, onStatusChange }: Swipeabl
 
   const handleClick = () => {
     if (!isSwiping.current) {
-      onTap();
+      // Tap cycles transfer status instead of opening modal
+      onStatusChange(nextStatus);
+      setShowStatusChange(true);
+      setTimeout(() => setShowStatusChange(false), 1000);
+    }
+  };
+
+  const handleLongPress = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleTouchStartLongPress = (e: React.TouchEvent) => {
+    handleTouchStart(e);
+    handleLongPress.current = setTimeout(() => {
+      onTap(); // Long press opens detail modal
+    }, 500);
+  };
+
+  const clearLongPress = () => {
+    if (handleLongPress.current) {
+      clearTimeout(handleLongPress.current);
+      handleLongPress.current = null;
     }
   };
 
@@ -209,9 +228,9 @@ function SwipeablePlayerCard({ player, isInXI, onTap, onStatusChange }: Swipeabl
           }
         `}
         style={{ transform: `translateX(${swipeX}px)` }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onTouchStart={handleTouchStartLongPress}
+        onTouchMove={(e) => { handleTouchMove(e); clearLongPress(); }}
+        onTouchEnd={() => { handleTouchEnd(); clearLongPress(); }}
         onClick={handleClick}
       >
         {/* Position */}
@@ -588,9 +607,9 @@ export function SquadPage() {
             ))}
           </div>
 
-          {/* Player List - Swipe left/right to change transfer status */}
+          {/* Player List - Tap or swipe to change transfer status */}
           <div className="text-[10px] text-[var(--color-text-secondary)] text-center mb-2">
-            Desliza ← → para cambiar estado de fichaje
+            Toca para cambiar estado · Mantén pulsado para ver detalles
           </div>
           <div className="space-y-2">
             {sortedPlayers.map((player) => {

@@ -5,10 +5,11 @@ import { getClubColors } from '../game/data/clubColors';
 import type { Fixture } from '../game/data/GenesisLoader';
 
 export function FixturesPage() {
-  const { currentSave, getUserClub, getUpcomingFixtures, getLeagueFixtures, getClub } = useGame();
+  const { currentSave, getUserClub, getUpcomingFixtures, getLeagueFixtures, getClub, simulateToMatchday } = useGame();
   const match = useMatch();
   const [selectedCompetition, setSelectedCompetition] = useState<string | null>(null);
   const [showPastMatches, setShowPastMatches] = useState(false);
+  const [showSimulateConfirm, setShowSimulateConfirm] = useState<number | null>(null);
 
   const userClub = getUserClub();
 
@@ -374,24 +375,62 @@ export function FixturesPage() {
         </div>
       )}
 
+      {/* Simulate Confirmation Modal */}
+      {showSimulateConfirm !== null && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[var(--color-bg-card)] rounded-xl p-4 max-w-sm w-full border border-[var(--color-border)]">
+            <h3 className="text-lg font-bold mb-2">Simular hasta Jornada {showSimulateConfirm}</h3>
+            <p className="text-sm text-[var(--color-text-secondary)] mb-4">
+              Se simularán automáticamente todos tus partidos hasta la jornada {showSimulateConfirm}.
+              Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowSimulateConfirm(null)}
+                className="flex-1 py-2 px-4 bg-[var(--color-bg-tertiary)] rounded-lg text-sm font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  if (activeComp) {
+                    simulateToMatchday(showSimulateConfirm, activeComp.id);
+                  }
+                  setShowSimulateConfirm(null);
+                }}
+                className="flex-1 py-2 px-4 bg-[var(--color-accent-green)] text-black rounded-lg text-sm font-bold"
+              >
+                Simular
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Full Schedule Section */}
       {activeComp && Object.keys(fixturesByMatchday).length > 0 && (
         <div className="mt-6">
           <h3 className="text-xs font-semibold text-[var(--color-text-secondary)] mb-3 px-1">
             CALENDARIO COMPLETO
           </h3>
+          <p className="text-[10px] text-[var(--color-text-secondary)] mb-2 px-1">
+            Toca una jornada futura para simular hasta ese punto
+          </p>
           <div className="space-y-3">
             {Object.entries(fixturesByMatchday)
               .filter(([md]) => parseInt(md) >= currentMatchday - 1)
               .slice(0, 6)
               .map(([matchday, fixtures]) => {
-                const isCurrentMD = parseInt(matchday) === currentMatchday;
+                const md = parseInt(matchday);
+                const isCurrentMD = md === currentMatchday;
                 const allPlayed = fixtures.every(f => f.status === 'FINISHED');
+                const isFutureMD = md > currentMatchday && !allPlayed;
 
                 return (
                   <div
                     key={matchday}
-                    className={`card p-0 overflow-hidden ${isCurrentMD ? 'border-[var(--color-accent-green)]' : ''}`}
+                    onClick={() => isFutureMD && setShowSimulateConfirm(md)}
+                    className={`card p-0 overflow-hidden ${isCurrentMD ? 'border-[var(--color-accent-green)]' : ''} ${isFutureMD ? 'cursor-pointer hover:border-[var(--color-accent-cyan)]' : ''}`}
                   >
                     <div className={`p-2 border-b border-[var(--color-border)] flex justify-between items-center ${
                       isCurrentMD ? 'bg-[var(--color-accent-green)]/10' : 'bg-[var(--color-bg-tertiary)]'
@@ -401,6 +440,11 @@ export function FixturesPage() {
                         {isCurrentMD && (
                           <span className="text-[10px] bg-[var(--color-accent-green)] text-black px-2 py-0.5 rounded-full font-bold">
                             ACTUAL
+                          </span>
+                        )}
+                        {isFutureMD && (
+                          <span className="text-[10px] bg-[var(--color-accent-cyan)]/20 text-[var(--color-accent-cyan)] px-2 py-0.5 rounded-full font-bold">
+                            Simular →
                           </span>
                         )}
                       </div>

@@ -511,21 +511,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
         {/* Quick Actions - Improved grid */}
         <div className="mt-6">
           <h3 className="text-xs font-semibold text-[var(--color-text-secondary)] mb-2 px-1">ACCIONES RAPIDAS</h3>
-          <div className="grid grid-cols-4 gap-2">
-            <button
-              onClick={() => advanceDay(1)}
-              className="p-3 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl text-center hover:border-[var(--color-accent-green)] transition-colors"
-            >
-              <div className="text-xl mb-1">📅</div>
-              <div className="text-xs font-semibold">+1 Dia</div>
-            </button>
-            <button
-              onClick={() => advanceDay(7)}
-              className="p-3 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl text-center hover:border-[var(--color-accent-green)] transition-colors"
-            >
-              <div className="text-xl mb-1">⏩</div>
-              <div className="text-xs font-semibold">+1 Sem</div>
-            </button>
+          <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => onNavigate('squad')}
               className="p-3 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl text-center hover:border-[var(--color-accent-green)] transition-colors"
@@ -533,6 +519,13 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
               <div className="text-xl mb-1">👥</div>
               <div className="text-xs font-semibold">Plantilla</div>
               <div className="text-[10px] text-[var(--color-text-secondary)]">{squad.length}</div>
+            </button>
+            <button
+              onClick={() => onNavigate('fixtures')}
+              className="p-3 bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-xl text-center hover:border-[var(--color-accent-green)] transition-colors"
+            >
+              <div className="text-xl mb-1">📅</div>
+              <div className="text-xs font-semibold">Calendario</div>
             </button>
             <button
               onClick={() => onNavigate('world')}
