@@ -8,6 +8,7 @@ import { FixturesPage } from './pages/FixturesPage';
 import { WorldPage } from './pages/WorldPage';
 import { OfficePage } from './pages/OfficePage';
 import { MatchDayPage, type MatchState } from './pages/MatchDayPage';
+import { SeasonSummaryModal } from './components/ui';
 
 export type PageId = 'home' | 'squad' | 'fixtures' | 'world' | 'office';
 
@@ -133,6 +134,8 @@ function GameUI() {
         </main>
         <BottomNav activePage={activePage} onNavigate={setActivePage} />
       </div>
+      {/* Season Summary Modal - shows when season ends */}
+      <SeasonSummaryModal />
     </MatchContext.Provider>
   );
 }

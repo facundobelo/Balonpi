@@ -129,6 +129,7 @@ export interface IClub {
 
   // Finance
   balance: number;
+  budget?: number;          // Transfer budget (usually = balance, can be different)
   wageBudget?: number;
   wageLimit?: number;
   sponsorIncome?: number;

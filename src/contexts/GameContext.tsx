@@ -95,6 +95,12 @@ interface GameContextValue {
 
   // Simulate to matchday (auto-simulate user matches)
   simulateToMatchday: (targetMatchday: number, leagueId: string) => void;
+
+  // Season management
+  isSeasonComplete: boolean;
+  showSeasonSummary: boolean;
+  setShowSeasonSummary: (show: boolean) => void;
+  startNewSeason: () => void;
 }
 
 const GameContext = createContext<GameContextValue | null>(null);
@@ -119,6 +125,10 @@ export function GameProvider({ children }: GameProviderProps) {
   const [saves, setSaves] = useState<SaveSlot[]>([]);
   const [masterDb, setMasterDb] = useState<MasterDatabaseSchema | null>(null);
   const [fixtures, setFixtures] = useState<SeasonFixtures | null>(null);
+  const [showSeasonSummary, setShowSeasonSummary] = useState(false);
+
+  // Check if season is complete
+  const isSeasonComplete = saveManager.isSeasonComplete();
 
   // Initialize on mount
   useEffect(() => {
@@ -698,16 +708,9 @@ export function GameProvider({ children }: GameProviderProps) {
     currentSave.gameDate = currentDate.toISOString().split('T')[0];
 
     // Check if season should end (all league fixtures finished)
-    const seasonEnded = saveManager.checkAndProcessSeasonEnd();
-    if (seasonEnded) {
-      // Season ended, get the updated save from saveManager
-      const updatedSave = saveManager.getCurrentSave();
-      if (updatedSave) {
-        // Also update local fixtures state with new season fixtures
-        setFixtures(updatedSave.fixtures || null);
-        setCurrentSave({ ...updatedSave });
-        return;
-      }
+    if (saveManager.isSeasonComplete()) {
+      // Season complete - show summary screen instead of auto-processing
+      setShowSeasonSummary(true);
     }
 
     // Save and update state
@@ -785,7 +788,8 @@ export function GameProvider({ children }: GameProviderProps) {
     }
 
     // Check budget (ensure it won't go negative)
-    if (offerAmount > (userClub.budget || 0)) {
+    const userBudget = userClub.budget ?? userClub.balance ?? 0;
+    if (offerAmount > userBudget) {
       return { success: false, message: 'Presupuesto insuficiente' };
     }
 
@@ -962,9 +966,11 @@ export function GameProvider({ children }: GameProviderProps) {
       player.clubId = userClub.id;
       player.transferStatus = 'AVAILABLE';
 
-      // Update finances
+      // Update finances - ensure budget exists
+      if (userClub.budget === undefined) userClub.budget = userClub.balance || 0;
+      if (sellerClub.budget === undefined) sellerClub.budget = sellerClub.balance || 0;
       userClub.budget -= offerAmount;
-      sellerClub.budget = (sellerClub.budget || 0) + offerAmount;
+      sellerClub.budget += offerAmount;
 
       // Set the wage
       player.wage = newWage;
@@ -1028,8 +1034,11 @@ export function GameProvider({ children }: GameProviderProps) {
     // Transfer
     player.clubId = buyerClubId;
     player.transferStatus = 'AVAILABLE';
+    // Ensure budget exists
+    if (userClub.budget === undefined) userClub.budget = userClub.balance || 0;
+    if (buyerClub.budget === undefined) buyerClub.budget = buyerClub.balance || 0;
     userClub.budget += amount;
-    buyerClub.budget = Math.max(0, (buyerClub.budget || 0) - amount);
+    buyerClub.budget = Math.max(0, buyerClub.budget - amount);
 
     currentSave.transferHistory.push({
       id: `transfer_${Date.now()}`,
@@ -1310,15 +1319,9 @@ export function GameProvider({ children }: GameProviderProps) {
     currentSave.fixtures = { ...fixtures };
 
     // Check if season should end (all league fixtures finished)
-    const seasonEnded = saveManager.checkAndProcessSeasonEnd();
-    if (seasonEnded) {
-      // Season ended, get the updated save from saveManager
-      const updatedSave = saveManager.getCurrentSave();
-      if (updatedSave) {
-        setFixtures(updatedSave.fixtures || null);
-        setCurrentSave({ ...updatedSave });
-        return;
-      }
+    if (saveManager.isSeasonComplete()) {
+      // Season complete - show summary screen instead of auto-processing
+      setShowSeasonSummary(true);
     }
 
     // Update fixtures and save
@@ -1326,6 +1329,17 @@ export function GameProvider({ children }: GameProviderProps) {
     saveManager.scheduleAutoSave();
     setCurrentSave({ ...currentSave });
   }, [currentSave, fixtures]);
+
+  // Start a new season (called from season summary screen)
+  const startNewSeason = useCallback(() => {
+    saveManager.startNewSeason();
+    const updatedSave = saveManager.getCurrentSave();
+    if (updatedSave) {
+      setFixtures(updatedSave.fixtures || null);
+      setCurrentSave({ ...updatedSave });
+    }
+    setShowSeasonSummary(false);
+  }, []);
 
   const value: GameContextValue = {
     isInitialized,
@@ -1354,6 +1368,10 @@ export function GameProvider({ children }: GameProviderProps) {
     makeTransferOffer,
     sellPlayer,
     simulateToMatchday,
+    isSeasonComplete,
+    showSeasonSummary,
+    setShowSeasonSummary,
+    startNewSeason,
   };
 
   return (

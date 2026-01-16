@@ -135,6 +135,9 @@ function SwipeablePlayerCard({ player, isInXI, onTap, onStatusChange }: Swipeabl
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
   const isSwiping = useRef(false);
+  const hadTouchInteraction = useRef(false);
+  const longPressTriggered = useRef(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const transferIndicator = getTransferStatusIndicator(player.transferStatus);
   const statusInfo = getTransferStatusInfo(player.transferStatus);
@@ -147,6 +150,14 @@ function SwipeablePlayerCard({ player, isInXI, onTap, onStatusChange }: Swipeabl
     touchStartX.current = e.touches[0].clientX;
     touchStartY.current = e.touches[0].clientY;
     isSwiping.current = false;
+    hadTouchInteraction.current = true;
+    longPressTriggered.current = false;
+
+    // Start long press timer
+    longPressTimer.current = setTimeout(() => {
+      longPressTriggered.current = true;
+      onTap(); // Long press opens detail modal
+    }, 500);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -154,6 +165,12 @@ function SwipeablePlayerCard({ player, isInXI, onTap, onStatusChange }: Swipeabl
     const currentY = e.touches[0].clientY;
     const diffX = currentX - touchStartX.current;
     const diffY = currentY - touchStartY.current;
+
+    // Cancel long press on any movement
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
 
     // Only swipe if horizontal movement is greater than vertical
     if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
@@ -164,6 +181,19 @@ function SwipeablePlayerCard({ player, isInXI, onTap, onStatusChange }: Swipeabl
   };
 
   const handleTouchEnd = () => {
+    // Clear long press timer
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+
+    // Don't do anything if long press already triggered
+    if (longPressTriggered.current) {
+      setSwipeX(0);
+      isSwiping.current = false;
+      return;
+    }
+
     if (isSwiping.current) {
       if (swipeX > 40) {
         // Swiped right - go to next status
@@ -176,34 +206,27 @@ function SwipeablePlayerCard({ player, isInXI, onTap, onStatusChange }: Swipeabl
         setShowStatusChange(true);
         setTimeout(() => setShowStatusChange(false), 1000);
       }
+    } else {
+      // Simple tap - cycle transfer status
+      onStatusChange(nextStatus);
+      setShowStatusChange(true);
+      setTimeout(() => setShowStatusChange(false), 1000);
     }
     setSwipeX(0);
     isSwiping.current = false;
   };
 
-  const handleClick = () => {
-    if (!isSwiping.current) {
-      // Tap cycles transfer status instead of opening modal
-      onStatusChange(nextStatus);
-      setShowStatusChange(true);
-      setTimeout(() => setShowStatusChange(false), 1000);
+  const handleClick = (e: React.MouseEvent) => {
+    // Ignore click if we had a touch interaction (touch devices fire both)
+    if (hadTouchInteraction.current) {
+      hadTouchInteraction.current = false;
+      e.preventDefault();
+      return;
     }
-  };
-
-  const handleLongPress = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleTouchStartLongPress = (e: React.TouchEvent) => {
-    handleTouchStart(e);
-    handleLongPress.current = setTimeout(() => {
-      onTap(); // Long press opens detail modal
-    }, 500);
-  };
-
-  const clearLongPress = () => {
-    if (handleLongPress.current) {
-      clearTimeout(handleLongPress.current);
-      handleLongPress.current = null;
-    }
+    // Desktop click - cycle transfer status
+    onStatusChange(nextStatus);
+    setShowStatusChange(true);
+    setTimeout(() => setShowStatusChange(false), 1000);
   };
 
   return (
@@ -228,9 +251,9 @@ function SwipeablePlayerCard({ player, isInXI, onTap, onStatusChange }: Swipeabl
           }
         `}
         style={{ transform: `translateX(${swipeX}px)` }}
-        onTouchStart={handleTouchStartLongPress}
-        onTouchMove={(e) => { handleTouchMove(e); clearLongPress(); }}
-        onTouchEnd={() => { handleTouchEnd(); clearLongPress(); }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         onClick={handleClick}
       >
         {/* Position */}
@@ -519,6 +542,10 @@ export function SquadPage() {
                   `}>
                     {player.skillBase}
                   </div>
+                  {/* Condition arrow */}
+                  <div className="absolute -top-1 -right-1">
+                    <FormArrow condition={player.conditionArrow} size="xs" />
+                  </div>
                   {/* Player name */}
                   <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 text-[9px] text-white font-medium text-center whitespace-nowrap bg-black/50 px-1.5 py-0.5 rounded">
                     {player.name.split(' ').pop()}
@@ -558,7 +585,10 @@ export function SquadPage() {
                 >
                   <PositionBadge position={player.positionMain} size="xs" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium truncate">{player.name}</div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs font-medium truncate">{player.name}</span>
+                      <FormArrow condition={player.conditionArrow} size="xs" />
+                    </div>
                     <div className="text-[10px] text-[var(--color-text-secondary)]">{player.age} años</div>
                   </div>
                   <div className="text-xs font-mono font-bold">{player.skillBase}</div>
@@ -657,7 +687,7 @@ export function SquadPage() {
           <div className="py-3 text-center">
             <div className="text-[10px] text-[var(--color-text-secondary)]">Presupuesto</div>
             <div className="font-mono text-sm font-bold text-[var(--color-accent-green)]">
-              {formatCurrency(club.budget || 0)}
+              {formatCurrency(club.budget || club.balance || 0)}
             </div>
           </div>
         </div>

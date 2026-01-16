@@ -338,10 +338,10 @@ class SaveManager {
   }
 
   /**
-   * Check if all league fixtures are finished and process season end if needed
-   * Returns true if season was ended
+   * Check if all league fixtures are finished (season complete but not yet processed)
+   * Returns true if season is complete and ready for summary screen
    */
-  checkAndProcessSeasonEnd(): boolean {
+  isSeasonComplete(): boolean {
     if (!this.currentSave || !this.currentSave.fixtures) return false;
 
     // Find user's league
@@ -357,10 +357,27 @@ class SaveManager {
     if (!leagueFixtures || leagueFixtures.length === 0) return false;
 
     // Check if all fixtures in user's league are finished
-    const allFinished = leagueFixtures.every(f => f.status === 'FINISHED');
-    if (!allFinished) return false;
+    return leagueFixtures.every(f => f.status === 'FINISHED');
+  }
+
+  /**
+   * Check if all league fixtures are finished and process season end if needed
+   * Returns true if season was ended
+   * @deprecated Use isSeasonComplete + startNewSeason instead
+   */
+  checkAndProcessSeasonEnd(): boolean {
+    if (!this.isSeasonComplete()) return false;
 
     console.log('All league fixtures finished! Processing season end...');
+    this.startNewSeason();
+    return true;
+  }
+
+  /**
+   * Start a new season (called when user confirms from season summary screen)
+   */
+  startNewSeason(): void {
+    if (!this.currentSave) return;
 
     // Get current date and advance to July 1st for new season
     const currentDate = new Date(this.currentSave.gameDate);
@@ -383,7 +400,6 @@ class SaveManager {
     this.processNewSeason(newSeasonDate);
 
     this.scheduleAutoSave();
-    return true;
   }
 
   /**

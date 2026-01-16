@@ -78,7 +78,7 @@ export function OfficePage() {
       return currentPosition === 1 ? 'Líder' : `${currentPosition}°`;
     }
     if (obj.type === 'FINANCIAL_BALANCE') {
-      return formatCurrency(userClub.budget || 0);
+      return formatCurrency(userClub.budget || userClub.balance || 0);
     }
     return '-';
   };
@@ -101,7 +101,7 @@ export function OfficePage() {
       return 'DANGER';
     }
     if (obj.type === 'FINANCIAL_BALANCE') {
-      return (userClub.budget || 0) >= 0 ? 'ON_TRACK' : 'DANGER';
+      return (userClub.budget || userClub.balance || 0) >= 0 ? 'ON_TRACK' : 'DANGER';
     }
     return 'ON_TRACK';
   };
@@ -255,7 +255,7 @@ export function OfficePage() {
         <div className="card p-3">
           <div className="text-[var(--color-text-secondary)] text-xs mb-1">Presupuesto</div>
           <div className="font-mono text-lg font-bold text-[var(--color-accent-green)]">
-            {formatCurrency(userClub.budget || 0)}
+            {formatCurrency(userClub.budget || userClub.balance || 0)}
           </div>
         </div>
       </div>

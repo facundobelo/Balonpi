@@ -278,6 +278,7 @@ export class GenesisLoader {
       isNationalTeam: raw.isNationalTeam || false,
 
       balance: raw.budget || raw.balance || 1000000,
+      budget: raw.budget || raw.balance || 1000000,
       wageBudget: raw.wageBudget || Math.floor((raw.budget || 1000000) * 0.015),
       wageLimit: raw.wageLimit,
       sponsorIncome: raw.sponsorIncome,
