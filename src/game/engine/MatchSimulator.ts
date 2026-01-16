@@ -218,14 +218,14 @@ function simulateTick(
   const homeTrailingMod = scoreDiff < 0 ? 1 + Math.abs(scoreDiff) * 0.1 : 1;
   const awayTrailingMod = scoreDiff > 0 ? 1 + Math.abs(scoreDiff) * 0.1 : 1;
 
-  // Calculate goal chances
+  // Calculate goal chances (use Math.max to prevent division by zero)
   const homeGoalChance = config.goalChanceBase
-    * (homePower.attack / awayPower.defense)
+    * (homePower.attack / Math.max(1, awayPower.defense))
     * minuteMod
     * homeTrailingMod;
 
   const awayGoalChance = config.goalChanceBase
-    * (awayPower.attack / homePower.defense)
+    * (awayPower.attack / Math.max(1, homePower.defense))
     * minuteMod
     * awayTrailingMod
     * 0.9; // Away disadvantage
@@ -235,7 +235,7 @@ function simulateTick(
     newState.homeShots++;
 
     // Calculate xG for this chance
-    const chanceQuality = (homePower.attack / awayPower.defense) * 0.15;
+    const chanceQuality = (homePower.attack / Math.max(1, awayPower.defense)) * 0.15;
     newState.homeXG = (newState.homeXG || 0) + chanceQuality;
 
     // Did it go in?
@@ -276,7 +276,7 @@ function simulateTick(
   if (Math.random() < awayGoalChance * 2) {
     newState.awayShots++;
 
-    const chanceQuality = (awayPower.attack / homePower.defense) * 0.15;
+    const chanceQuality = (awayPower.attack / Math.max(1, homePower.defense)) * 0.15;
     newState.awayXG = (newState.awayXG || 0) + chanceQuality;
 
     const conversionRate = 0.32 + (awayPower.attack - 50) * 0.003;

@@ -65,7 +65,17 @@ export function MatchDayPage({ opponentClubId, isHome, competitionName, onFinish
   const userClub = getUserClub();
   const userSquad = getUserSquad();
   const opponent = currentSave?.clubs.find(c => c.id === opponentClubId);
-  const opponentSquad = currentSave?.players.filter(p => p.clubId === opponentClubId) || [];
+
+  // Filter opponent squad for available players (not injured/suspended)
+  const opponentSquad = useMemo(() => {
+    const today = currentSave?.gameDate || '';
+    const allOpponentPlayers = currentSave?.players.filter(p => p.clubId === opponentClubId) || [];
+    return allOpponentPlayers.filter(p => {
+      if (p.injuredUntil && p.injuredUntil > today) return false;
+      if (p.suspendedUntil && p.suspendedUntil > today) return false;
+      return true;
+    });
+  }, [currentSave?.players, currentSave?.gameDate, opponentClubId]);
 
   // Initialize lineup on mount
   useEffect(() => {
@@ -136,7 +146,8 @@ export function MatchDayPage({ opponentClubId, isHome, competitionName, onFinish
     tactic
   ) : null;
 
-  const opponentTeam = opponent ? createMatchTeam(
+  // Only create opponent team if they have at least 11 available players
+  const opponentTeam = opponent && opponentSquad.length >= 11 ? createMatchTeam(
     opponent.id,
     opponent.name,
     opponentSquad,

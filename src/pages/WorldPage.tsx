@@ -144,7 +144,7 @@ export function WorldPage() {
           <div className="text-right">
             <div className="text-xs text-[var(--color-text-secondary)]">Tu presupuesto</div>
             <div className="text-sm font-mono font-bold text-[var(--color-accent-green)]">
-              {formatCurrency(userClub.budget)}
+              {formatCurrency(userClub.budget || 0)}
             </div>
           </div>
         </div>

@@ -436,8 +436,34 @@ class SaveManager {
     // Process end-of-season development (aging, skill changes)
     processSeasonDevelopment(this.currentSave.players);
 
-    // Reset player season stats completely
+    // Save previous season stats to career history before resetting
+    const previousSeason = this.currentSave.season;
     for (const player of this.currentSave.players) {
+      // Only save to history if player had appearances
+      if (player.currentSeasonStats.appearances > 0) {
+        if (!player.careerHistory) {
+          player.careerHistory = [];
+        }
+        player.careerHistory.push({
+          seasonId: previousSeason,
+          clubId: player.clubId || '',
+          stats: {
+            appearances: player.currentSeasonStats.appearances,
+            goals: player.currentSeasonStats.goals,
+            assists: player.currentSeasonStats.assists,
+            cleanSheets: player.currentSeasonStats.cleanSheets,
+            yellowCards: player.currentSeasonStats.yellowCards,
+            redCards: player.currentSeasonStats.redCards,
+            avgRating: player.currentSeasonStats.avgRating,
+          },
+        });
+        // Limit career history to last 10 seasons to prevent memory bloat
+        if (player.careerHistory.length > 10) {
+          player.careerHistory = player.careerHistory.slice(-10);
+        }
+      }
+
+      // Reset player season stats completely
       player.currentSeasonStats = {
         goals: 0,
         assists: 0,

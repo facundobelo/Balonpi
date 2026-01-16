@@ -104,6 +104,23 @@ export function MainMenuPage() {
 
 // Reputación máxima de club que puede seleccionar un nuevo mánager
 const MAX_STARTER_REPUTATION = 60;
+// Máximo de clubes a mostrar por liga
+const MAX_CLUBS_TO_SHOW = 6;
+
+// Seeded random for consistent club selection per session
+function seededShuffle<T>(array: T[], seed: number): T[] {
+  const result = [...array];
+  let currentSeed = seed;
+  const random = () => {
+    currentSeed = (currentSeed * 1103515245 + 12345) & 0x7fffffff;
+    return currentSeed / 0x7fffffff;
+  };
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
 
 function NewGameScreen({ onBack }: { onBack: () => void }) {
   const { masterDb, createNewGame } = useGame();
@@ -113,6 +130,8 @@ function NewGameScreen({ onBack }: { onBack: () => void }) {
   const [selectedLeague, setSelectedLeague] = useState<string | null>(null);
   const [selectedClub, setSelectedClub] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  // Random seed for this session (changes each new game screen)
+  const [sessionSeed] = useState(() => Date.now());
 
   if (!masterDb) return null;
 
@@ -130,17 +149,21 @@ function NewGameScreen({ onBack }: { onBack: () => void }) {
         .sort((a, b) => a.tier - b.tier)
     : [];
 
-  // Get clubs for selected league - FILTERED by reputation for new managers
+  // Get clubs for selected league - FILTERED by reputation and RANDOMIZED
   const leagueClubs = selectedLeague
-    ? masterDb.clubs
-        .filter(c => c.leagueId === selectedLeague)
-        .filter(c => (c.reputation || 0) <= MAX_STARTER_REPUTATION)
+    ? (() => {
+        const eligibleClubs = masterDb.clubs
+          .filter(c => c.leagueId === selectedLeague)
+          .filter(c => (c.reputation || 0) <= MAX_STARTER_REPUTATION);
+        // Use session seed + league id for consistent randomization per league
+        const leagueSeed = sessionSeed + (selectedLeague?.charCodeAt(0) || 0);
+        const shuffled = seededShuffle(eligibleClubs, leagueSeed);
+        return shuffled.slice(0, MAX_CLUBS_TO_SHOW);
+      })()
     : [];
 
-  // Get ALL clubs in the league (for showing unavailable ones)
-  const allLeagueClubs = selectedLeague
-    ? masterDb.clubs.filter(c => c.leagueId === selectedLeague)
-    : [];
+  // No longer show all clubs - only show the random selection
+  const allLeagueClubs = leagueClubs;
 
   const handleStartGame = async () => {
     if (!selectedClub || !managerName.trim()) return;
@@ -179,13 +202,6 @@ function NewGameScreen({ onBack }: { onBack: () => void }) {
             />
           </div>
 
-          <div className="card p-3 bg-[var(--color-bg-secondary)]">
-            <p className="text-xs text-[var(--color-text-secondary)]">
-              Como nuevo mánager, comenzarás en un club pequeño para construir tu reputación.
-              Solo están disponibles clubes con reputación ≤ {MAX_STARTER_REPUTATION}.
-            </p>
-          </div>
-
           <button
             onClick={() => managerName.trim() && setStep('country')}
             disabled={!managerName.trim()}
@@ -205,10 +221,6 @@ function NewGameScreen({ onBack }: { onBack: () => void }) {
             {countriesWithLeagues.map((country) => {
               const countryLgs = leagues.filter(l => l.country === country);
               const totalTeams = countryLgs.reduce((sum, l) => sum + (l.teamIds?.length || 0), 0);
-              const availableClubs = masterDb.clubs.filter(c =>
-                countryLgs.some(l => l.teamIds?.includes(c.id)) &&
-                (c.reputation || 0) <= MAX_STARTER_REPUTATION
-              ).length;
 
               return (
                 <button
@@ -226,12 +238,7 @@ function NewGameScreen({ onBack }: { onBack: () => void }) {
                         {countryLgs.length} {countryLgs.length === 1 ? 'liga' : 'ligas'} · {totalTeams} equipos
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-mono text-[var(--color-accent-green)]">
-                        {availableClubs}
-                      </div>
-                      <div className="text-xs text-[var(--color-text-secondary)]">disponibles</div>
-                    </div>
+                    <span className="text-[var(--color-text-secondary)]">→</span>
                   </div>
                 </button>
               );
@@ -256,9 +263,6 @@ function NewGameScreen({ onBack }: { onBack: () => void }) {
 
           <div className="space-y-2">
             {countryLeagues.map((league) => {
-              const availableClubs = masterDb.clubs.filter(
-                c => c.leagueId === league.id && (c.reputation || 0) <= MAX_STARTER_REPUTATION
-              ).length;
               const isSecondDivision = league.tier === 2;
 
               return (
@@ -284,12 +288,7 @@ function NewGameScreen({ onBack }: { onBack: () => void }) {
                         {league.teamIds?.length || 0} equipos
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className={`text-sm font-mono ${availableClubs > 0 ? 'text-[var(--color-accent-green)]' : 'text-[var(--color-text-secondary)]'}`}>
-                        {availableClubs}
-                      </div>
-                      <div className="text-xs text-[var(--color-text-secondary)]">disponibles</div>
-                    </div>
+                    <span className="text-[var(--color-text-secondary)]">→</span>
                   </div>
                 </button>
               );
@@ -311,55 +310,39 @@ function NewGameScreen({ onBack }: { onBack: () => void }) {
       {/* Step 4: Select Club */}
       {step === 'club' && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center mb-4">
-            <p className="text-[var(--color-text-secondary)] text-sm">Selecciona tu club</p>
-            <p className="text-xs text-[var(--color-text-secondary)]">
-              {leagueClubs.length} de {allLeagueClubs.length} disponibles
-            </p>
-          </div>
+          <p className="text-[var(--color-text-secondary)] text-sm mb-4">Selecciona tu club</p>
 
           <div className="space-y-2 max-h-[55vh] overflow-y-auto">
             {allLeagueClubs
-              .sort((a, b) => (a.reputation || 0) - (b.reputation || 0))
+              .sort((a, b) => (b.reputation || 0) - (a.reputation || 0))
               .map((club) => {
                 const squad = masterDb.players.filter(p => p.clubId === club.id);
                 const avgSkill = squad.length
                   ? Math.round(squad.reduce((s, p) => s + p.skillBase, 0) / squad.length)
                   : 0;
-                const isAvailable = (club.reputation || 0) <= MAX_STARTER_REPUTATION;
 
                 return (
                   <button
                     key={club.id}
-                    onClick={() => isAvailable && setSelectedClub(club.id)}
-                    disabled={!isAvailable}
+                    onClick={() => setSelectedClub(club.id)}
                     className={`w-full card p-4 text-left transition-colors ${
-                      !isAvailable
-                        ? 'opacity-40 cursor-not-allowed'
-                        : selectedClub === club.id
+                      selectedClub === club.id
                         ? 'border-[var(--color-accent-green)] bg-[var(--color-accent-green)]/10'
                         : 'hover:border-[var(--color-border-hover)]'
                     }`}
                   >
                     <div className="flex justify-between items-start">
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">{club.name}</span>
-                          {!isAvailable && (
-                            <span className="text-xs bg-[var(--color-accent-red)]/20 text-[var(--color-accent-red)] px-2 py-0.5 rounded">
-                              Muy Grande
-                            </span>
-                          )}
-                        </div>
+                        <span className="font-semibold">{club.name}</span>
                         <div className="text-sm text-[var(--color-text-secondary)]">
                           {squad.length} jugadores · Media {avgSkill}
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className={`text-sm font-mono ${isAvailable ? 'text-[var(--color-accent-green)]' : 'text-[var(--color-text-secondary)]'}`}>
+                        <div className="text-sm font-mono text-[var(--color-accent-green)]">
                           ${((club.balance || 0) / 1000000).toFixed(1)}M
                         </div>
-                        <div className={`text-xs ${isAvailable ? 'text-[var(--color-text-secondary)]' : 'text-[var(--color-accent-red)]'}`}>
+                        <div className="text-xs text-[var(--color-text-secondary)]">
                           Rep {club.reputation || 0}
                         </div>
                       </div>
@@ -372,10 +355,10 @@ function NewGameScreen({ onBack }: { onBack: () => void }) {
           {leagueClubs.length === 0 && (
             <div className="card p-4 text-center bg-[var(--color-accent-yellow)]/10 border-[var(--color-accent-yellow)]">
               <p className="text-sm text-[var(--color-text-primary)]">
-                No hay clubes disponibles en esta liga para un nuevo mánager.
+                No hay clubes disponibles en esta liga.
               </p>
               <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-                Intenta con una liga de segunda división.
+                Intenta con otra liga.
               </p>
             </div>
           )}

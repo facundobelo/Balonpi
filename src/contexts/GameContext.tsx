@@ -493,54 +493,71 @@ export function GameProvider({ children }: GameProviderProps) {
       }
     }
 
-    // Simulate other league matches for the same matchday
+    // Simulate ALL league matches worldwide for the same matchday
     if (competitionId && fixtures) {
-      const competitionFixtures = fixtures[competitionId];
-      if (competitionFixtures) {
-        // Find the user's fixture to get the matchday
-        const userFixture = competitionFixtures.find(
-          f => f.homeClubId === homeClubId && f.awayClubId === awayClubId
-        );
-        const currentMatchday = userFixture?.matchday;
+      // Find the user's matchday from their fixture
+      const userCompetitionFixtures = fixtures[competitionId];
+      const userFixture = userCompetitionFixtures?.find(
+        f => f.homeClubId === homeClubId && f.awayClubId === awayClubId
+      );
+      const currentMatchday = userFixture?.matchday;
 
-        // Find other fixtures that are SCHEDULED, same matchday, and not the user's match
-        const otherMatches = competitionFixtures.filter(
+      // Iterate through ALL competitions/leagues
+      for (const [leagueId, leagueFixtures] of Object.entries(fixtures)) {
+        if (!leagueFixtures || leagueFixtures.length === 0) continue;
+
+        // Find matches in this league that are SCHEDULED and same matchday
+        const matchesToSimulate = leagueFixtures.filter(
           f => f.status === 'SCHEDULED' &&
                f.matchday === currentMatchday &&
+               // Exclude user's match (already processed)
                !(f.homeClubId === homeClubId && f.awayClubId === awayClubId) &&
+               // Exclude any match involving user's club (they play separately)
                !(f.homeClubId === currentSave.userClubId || f.awayClubId === currentSave.userClubId)
         );
 
-        // Simulate each match
-        for (const fixture of otherMatches) {
-          const homeClub = currentSave.clubs.find(c => c.id === fixture.homeClubId);
-          const awayClub = currentSave.clubs.find(c => c.id === fixture.awayClubId);
+        // Find the competition for updating standings
+        const competition = currentSave.competitions.find(c => c.id === leagueId);
+
+        // Simulate each match in this league
+        for (const fixture of matchesToSimulate) {
+          const homeClubMatch = currentSave.clubs.find(c => c.id === fixture.homeClubId);
+          const awayClubMatch = currentSave.clubs.find(c => c.id === fixture.awayClubId);
           const homePlayers = currentSave.players.filter(p => p.clubId === fixture.homeClubId);
           const awayPlayers = currentSave.players.filter(p => p.clubId === fixture.awayClubId);
 
-          if (homeClub && awayClub && homePlayers.length >= 11 && awayPlayers.length >= 11) {
-            // Create match teams (pass current date to filter injured/suspended players)
-            const homeTeam = createMatchTeam(homeClub.id, homeClub.name, homePlayers, '4-3-3', 'BALANCED', currentSave.gameDate);
-            const awayTeam = createMatchTeam(awayClub.id, awayClub.name, awayPlayers, '4-3-3', 'BALANCED', currentSave.gameDate);
+          // Filter out injured/suspended players for CPU teams
+          const isPlayerAvailable = (p: any) => {
+            if (p.injuredUntil && p.injuredUntil > currentSave.gameDate) return false;
+            if (p.suspendedUntil && p.suspendedUntil > currentSave.gameDate) return false;
+            return true;
+          };
+          const availableHomePlayers = homePlayers.filter(isPlayerAvailable);
+          const availableAwayPlayers = awayPlayers.filter(isPlayerAvailable);
+
+          // Only simulate if both teams have enough available players
+          if (homeClubMatch && awayClubMatch && availableHomePlayers.length >= 11 && availableAwayPlayers.length >= 11) {
+            // Create match teams with available players only
+            const homeTeam = createMatchTeam(homeClubMatch.id, homeClubMatch.name, availableHomePlayers, '4-3-3', 'BALANCED', currentSave.gameDate);
+            const awayTeam = createMatchTeam(awayClubMatch.id, awayClubMatch.name, availableAwayPlayers, '4-3-3', 'BALANCED', currentSave.gameDate);
 
             // Simulate the match
             const matchResult = simulateMatch(homeTeam, awayTeam);
 
             // Update fixture status
-            const fixtureIndex = competitionFixtures.findIndex(
-              f => f.homeClubId === fixture.homeClubId && f.awayClubId === fixture.awayClubId
+            const fixtureIndex = leagueFixtures.findIndex(
+              f => f.homeClubId === fixture.homeClubId && f.awayClubId === fixture.awayClubId && f.matchday === fixture.matchday
             );
             if (fixtureIndex !== -1) {
-              competitionFixtures[fixtureIndex] = {
-                ...competitionFixtures[fixtureIndex],
+              leagueFixtures[fixtureIndex] = {
+                ...leagueFixtures[fixtureIndex],
                 status: 'FINISHED',
                 homeScore: matchResult.homeScore,
                 awayScore: matchResult.awayScore,
               };
             }
 
-            // Update standings
-            const competition = currentSave.competitions.find(c => c.id === competitionId);
+            // Update standings for this league
             if (competition?.standings) {
               const homeStanding = competition.standings.find((s: any) => s.clubId === fixture.homeClubId);
               const awayStanding = competition.standings.find((s: any) => s.clubId === fixture.awayClubId);
@@ -582,24 +599,19 @@ export function GameProvider({ children }: GameProviderProps) {
               }
             }
 
-            // Update player stats for all events (goals, assists, cards, injuries)
+            // Update player stats for CPU matches
             for (const event of matchResult.events) {
               if (event.type === 'GOAL') {
                 const scorer = currentSave.players.find(p => p.id === event.playerId);
-                if (scorer) {
-                  scorer.currentSeasonStats.goals++;
-                }
+                if (scorer) scorer.currentSeasonStats.goals++;
                 if (event.assistPlayerId) {
                   const assister = currentSave.players.find(p => p.id === event.assistPlayerId);
-                  if (assister) {
-                    assister.currentSeasonStats.assists++;
-                  }
+                  if (assister) assister.currentSeasonStats.assists++;
                 }
               } else if (event.type === 'YELLOW') {
                 const player = currentSave.players.find(p => p.id === event.playerId);
                 if (player) {
                   player.currentSeasonStats.yellowCards++;
-                  // Check for accumulated yellows (5 = 1 match suspension)
                   if (player.currentSeasonStats.yellowCards % 5 === 0) {
                     const suspendedDate = new Date(currentSave.gameDate);
                     suspendedDate.setDate(suspendedDate.getDate() + 7);
@@ -611,7 +623,6 @@ export function GameProvider({ children }: GameProviderProps) {
                 const player = currentSave.players.find(p => p.id === event.playerId);
                 if (player) {
                   player.currentSeasonStats.redCards++;
-                  // Suspend for 1 match
                   const suspendedDate = new Date(currentSave.gameDate);
                   suspendedDate.setDate(suspendedDate.getDate() + 7);
                   player.suspendedUntil = suspendedDate.toISOString().split('T')[0];
@@ -627,7 +638,7 @@ export function GameProvider({ children }: GameProviderProps) {
               }
             }
 
-            // Update appearances for players who played (using lineup from matchResult)
+            // Update appearances
             const allPlayersInMatch = [
               ...(matchResult.homeLineup || []),
               ...(matchResult.awayLineup || []),
@@ -636,12 +647,10 @@ export function GameProvider({ children }: GameProviderProps) {
             ];
             for (const playerId of allPlayersInMatch) {
               const player = currentSave.players.find(p => p.id === playerId);
-              if (player) {
-                player.currentSeasonStats.appearances++;
-              }
+              if (player) player.currentSeasonStats.appearances++;
             }
 
-            // Update clean sheets for goalkeepers
+            // Update clean sheets
             if (matchResult.awayScore === 0 && matchResult.homeLineup?.length) {
               const homeGK = currentSave.players.find(p =>
                 matchResult.homeLineup.includes(p.id) && p.positionMain === 'GK'
@@ -655,24 +664,26 @@ export function GameProvider({ children }: GameProviderProps) {
               if (awayGK) awayGK.currentSeasonStats.cleanSheets++;
             }
 
-            // Add to match history
-            currentSave.matchHistory.push({
-              id: `match_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-              date: currentSave.gameDate,
-              competitionId: competitionId,
-              homeClubId: fixture.homeClubId,
-              awayClubId: fixture.awayClubId,
-              homeScore: matchResult.homeScore,
-              awayScore: matchResult.awayScore,
-              events: [],
-            });
+            // Add to match history (limit to prevent memory issues)
+            if (currentSave.matchHistory.length < 500) {
+              currentSave.matchHistory.push({
+                id: `match_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                date: currentSave.gameDate,
+                competitionId: leagueId,
+                homeClubId: fixture.homeClubId,
+                awayClubId: fixture.awayClubId,
+                homeScore: matchResult.homeScore,
+                awayScore: matchResult.awayScore,
+                events: [],
+              });
+            }
           }
         }
-
-        // Update fixtures in save after all simulations
-        currentSave.fixtures = { ...fixtures };
-        setFixtures({ ...fixtures });
       }
+
+      // Update fixtures in save after all simulations
+      currentSave.fixtures = { ...fixtures };
+      setFixtures({ ...fixtures });
     }
 
     // Advance game date by 7 days (next matchday)
@@ -746,8 +757,8 @@ export function GameProvider({ children }: GameProviderProps) {
       return { success: false, message: 'Este jugador ya es tuyo' };
     }
 
-    // Check budget
-    if (offerAmount > userClub.budget) {
+    // Check budget (ensure it won't go negative)
+    if (offerAmount > (userClub.budget || 0)) {
       return { success: false, message: 'Presupuesto insuficiente' };
     }
 
