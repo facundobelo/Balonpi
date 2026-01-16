@@ -24,8 +24,8 @@ const RETIREMENT_MIN_AGE = 33;
  */
 export function processSeasonDevelopment(players: IPlayer[]): void {
   for (const player of players) {
-    // Age the player by 1 year
-    player.age++;
+    // Age the player by 1 year (cap at 45 for realism)
+    player.age = Math.min(player.age + 1, 45);
 
     // Calculate skill change based on age and potential
     const skillChange = calculateSkillChange(player);

@@ -402,7 +402,7 @@ export function GameProvider({ children }: GameProviderProps) {
       }
     }
 
-    // Add to match history
+    // Add to match history (limit to 500 to prevent memory issues)
     currentSave.matchHistory.push({
       id: `match_${Date.now()}`,
       date: currentSave.gameDate,
@@ -413,6 +413,9 @@ export function GameProvider({ children }: GameProviderProps) {
       awayScore: result.awayScore,
       events: matchEvents,
     });
+    if (currentSave.matchHistory.length > 500) {
+      currentSave.matchHistory = currentSave.matchHistory.slice(-500);
+    }
 
     // Generate news for important events
     const homeClub = currentSave.clubs.find(c => c.id === homeClubId);
@@ -743,6 +746,14 @@ export function GameProvider({ children }: GameProviderProps) {
   const makeTransferOffer = useCallback((playerId: string, offerAmount: number): { success: boolean; message: string } => {
     if (!currentSave) return { success: false, message: 'No hay partida activa' };
 
+    // Check if transfer window is open
+    const gameDate = new Date(currentSave.gameDate);
+    const month = gameDate.getMonth();
+    const isWindowOpen = month === 6 || month === 7 || month === 0; // July, August, January
+    if (!isWindowOpen) {
+      return { success: false, message: 'El mercado de fichajes está cerrado' };
+    }
+
     const player = currentSave.players.find(p => p.id === playerId);
     if (!player) return { success: false, message: 'Jugador no encontrado' };
 
@@ -917,6 +928,19 @@ export function GameProvider({ children }: GameProviderProps) {
     }
 
     if (accepted) {
+      // Calculate the new wage before accepting
+      const newWage = Math.round((player.skillBase * 2000 + player.marketValue * 0.001) / 1000) * 1000;
+
+      // Check wage budget if club has a limit
+      if (userClub.wageLimit) {
+        const currentWages = currentSave.players
+          .filter(p => p.clubId === userClub.id)
+          .reduce((sum, p) => sum + (p.wage || 0), 0);
+        if (currentWages + newWage > userClub.wageLimit) {
+          return { success: false, message: 'El salario excede el límite salarial del club' };
+        }
+      }
+
       // Transfer the player
       const previousClubId = player.clubId;
       player.clubId = userClub.id;
@@ -926,8 +950,7 @@ export function GameProvider({ children }: GameProviderProps) {
       userClub.budget -= offerAmount;
       sellerClub.budget = (sellerClub.budget || 0) + offerAmount;
 
-      // Update wages (rough estimate)
-      const newWage = Math.round((player.skillBase * 2000 + player.marketValue * 0.001) / 1000) * 1000;
+      // Set the wage
       player.wage = newWage;
 
       // Add to transfer history

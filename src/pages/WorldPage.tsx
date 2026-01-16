@@ -123,8 +123,16 @@ export function WorldPage() {
     );
   }
 
-  // Check if transfer window is open (simplified - always open for now)
-  const isTransferWindowOpen = true;
+  // Check if transfer window is open
+  // Summer window: July 1 - August 31
+  // Winter window: January 1 - January 31
+  const isTransferWindowOpen = useMemo(() => {
+    if (!currentSave?.gameDate) return false;
+    const date = new Date(currentSave.gameDate);
+    const month = date.getMonth(); // 0-indexed
+    // July (6), August (7), January (0)
+    return month === 6 || month === 7 || month === 0;
+  }, [currentSave?.gameDate]);
 
   return (
     <div className="min-h-screen bg-[var(--color-bg-primary)] pb-20">

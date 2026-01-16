@@ -285,11 +285,49 @@ class SaveManager {
     const save = await db.get('saves', saveId);
 
     if (save) {
+      // Validate and clean up data integrity
+      this.validateSaveData(save);
       this.currentSave = save;
       await db.put('settings', { key: 'lastSaveId', value: saveId });
     }
 
     return save || null;
+  }
+
+  /**
+   * Validate and repair save data integrity
+   */
+  private validateSaveData(save: GameSave): void {
+    const playerIds = new Set(save.players.map(p => p.id));
+
+    // Validate club squadIds reference existing players
+    for (const club of save.clubs) {
+      if (club.squadIds) {
+        club.squadIds = club.squadIds.filter((id: string) => playerIds.has(id));
+      }
+    }
+
+    // Ensure all players have valid clubId references
+    const clubIds = new Set(save.clubs.map(c => c.id));
+    for (const player of save.players) {
+      if (player.clubId && !clubIds.has(player.clubId)) {
+        player.clubId = null; // Make them free agent if club doesn't exist
+      }
+    }
+
+    // Validate competition teamIds
+    for (const comp of save.competitions) {
+      if (comp.teamIds) {
+        comp.teamIds = comp.teamIds.filter((id: string) => clubIds.has(id));
+      }
+    }
+
+    // Ensure standings have valid clubIds
+    for (const comp of save.competitions) {
+      if (comp.standings) {
+        comp.standings = comp.standings.filter((s: any) => clubIds.has(s.clubId));
+      }
+    }
   }
 
   /**
@@ -313,16 +351,30 @@ class SaveManager {
   }
 
   /**
-   * Auto-save (debounced)
+   * Auto-save (debounced with state snapshot)
    */
   private autoSaveTimeout: ReturnType<typeof setTimeout> | null = null;
+  private pendingSave: boolean = false;
 
   scheduleAutoSave(delayMs: number = 5000): void {
+    // If already saving, mark that another save is needed
+    if (this.pendingSave) {
+      return;
+    }
+
     if (this.autoSaveTimeout) {
       clearTimeout(this.autoSaveTimeout);
     }
-    this.autoSaveTimeout = setTimeout(() => {
-      this.save().catch(console.error);
+
+    this.autoSaveTimeout = setTimeout(async () => {
+      this.pendingSave = true;
+      try {
+        await this.save();
+      } catch (error) {
+        console.error('Auto-save failed:', error);
+      } finally {
+        this.pendingSave = false;
+      }
     }, delayMs);
   }
 
@@ -501,8 +553,8 @@ class SaveManager {
     // Clear old match history (keep last 50 for reference)
     this.currentSave.matchHistory = this.currentSave.matchHistory.slice(-50);
 
-    // Keep only last 30 news items
-    this.currentSave.newsItems = this.currentSave.newsItems.slice(0, 30);
+    // Keep only last 50 news items (consistent with in-game limit)
+    this.currentSave.newsItems = this.currentSave.newsItems.slice(0, 50);
 
     // Generate new board objectives
     const userClub = this.currentSave.clubs.find(c => c.id === this.currentSave!.userClubId);
@@ -517,8 +569,12 @@ class SaveManager {
 
     const newFixtures: { [competitionId: string]: any[] } = {};
 
-    // Start fixtures from mid-August
+    // Start fixtures from mid-August of the new season year
     const fixtureStartDate = new Date(startDate);
+    // If we're past August, use next year for the new season
+    if (startDate.getMonth() >= 5) { // June or later = new season starts next August
+      fixtureStartDate.setFullYear(startDate.getFullYear());
+    }
     fixtureStartDate.setMonth(7); // August
     fixtureStartDate.setDate(17); // 17th
     // Find first Saturday

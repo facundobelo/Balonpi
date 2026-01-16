@@ -582,14 +582,20 @@ export function createMatchTeam(
   tactic: 'DEFENSIVE' | 'BALANCED' | 'ATTACKING' = 'BALANCED',
   currentDate?: string
 ): MatchTeam {
-  // Select best 11 players based on position needs
-  const positionNeeds: Record<string, number> = {
+  // Valid formations with position requirements
+  const FORMATIONS: Record<string, Record<string, number>> = {
     '4-3-3': { GK: 1, DEF: 4, MID: 3, FWD: 3 },
     '4-4-2': { GK: 1, DEF: 4, MID: 4, FWD: 2 },
     '3-5-2': { GK: 1, DEF: 3, MID: 5, FWD: 2 },
     '4-2-3-1': { GK: 1, DEF: 4, MID: 5, FWD: 1 },
     '5-3-2': { GK: 1, DEF: 5, MID: 3, FWD: 2 },
-  }[formation] || { GK: 1, DEF: 4, MID: 3, FWD: 3 };
+    '5-4-1': { GK: 1, DEF: 5, MID: 4, FWD: 1 },
+    '3-4-3': { GK: 1, DEF: 3, MID: 4, FWD: 3 },
+  };
+
+  // Use valid formation or default to 4-3-3
+  const validFormation = FORMATIONS[formation] ? formation : '4-3-3';
+  const positionNeeds = FORMATIONS[validFormation];
 
   const selectedPlayers: MatchPlayer[] = [];
 
