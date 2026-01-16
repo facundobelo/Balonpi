@@ -238,7 +238,7 @@ export function TeamBrowserPage({ onClose, onMakeOffer }: TeamBrowserProps) {
               <div className="flex-1 overflow-y-auto p-2">
                 <div className="space-y-1">
                   {selectedSquad.map(player => {
-                    const canAfford = userClub.budget >= player.marketValue;
+                    const canAfford = (userClub.budget || 0) >= player.marketValue;
                     const isOwnPlayer = player.clubId === userClub.id;
 
                     return (
@@ -371,7 +371,7 @@ export function TeamBrowserPage({ onClose, onMakeOffer }: TeamBrowserProps) {
       {offerPlayer && userClub && (
         <TransferOfferModal
           player={offerPlayer}
-          userBudget={userClub.budget}
+          userBudget={userClub.budget || 0}
           onMakeOffer={makeTransferOffer}
           onClose={() => setOfferPlayer(null)}
         />

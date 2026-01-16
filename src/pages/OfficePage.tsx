@@ -78,7 +78,7 @@ export function OfficePage() {
       return currentPosition === 1 ? 'Líder' : `${currentPosition}°`;
     }
     if (obj.type === 'FINANCIAL_BALANCE') {
-      return formatCurrency(userClub.budget);
+      return formatCurrency(userClub.budget || 0);
     }
     return '-';
   };
@@ -101,7 +101,7 @@ export function OfficePage() {
       return 'DANGER';
     }
     if (obj.type === 'FINANCIAL_BALANCE') {
-      return userClub.budget >= 0 ? 'ON_TRACK' : 'DANGER';
+      return (userClub.budget || 0) >= 0 ? 'ON_TRACK' : 'DANGER';
     }
     return 'ON_TRACK';
   };

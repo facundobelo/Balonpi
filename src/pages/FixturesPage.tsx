@@ -292,14 +292,24 @@ export function FixturesPage() {
                       </div>
                     </div>
                   </div>
-                  {isNext && (
-                    <button
-                      onClick={() => opponent && match?.startMatch(opponent.id, isUserHome, activeComp?.name || 'Liga')}
-                      className="btn btn-sm bg-[var(--color-accent-green)] text-black font-bold"
-                    >
-                      Jugar
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {!isNext && (
+                      <button
+                        onClick={() => setShowSimulateConfirm(fixture.matchday)}
+                        className="btn btn-sm bg-[var(--color-accent-cyan)]/20 text-[var(--color-accent-cyan)] font-bold"
+                      >
+                        Simular
+                      </button>
+                    )}
+                    {isNext && (
+                      <button
+                        onClick={() => opponent && match?.startMatch(opponent.id, isUserHome, activeComp?.name || 'Liga')}
+                        className="btn btn-sm bg-[var(--color-accent-green)] text-black font-bold"
+                      >
+                        Jugar
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -413,9 +423,6 @@ export function FixturesPage() {
           <h3 className="text-xs font-semibold text-[var(--color-text-secondary)] mb-3 px-1">
             CALENDARIO COMPLETO
           </h3>
-          <p className="text-[10px] text-[var(--color-text-secondary)] mb-2 px-1">
-            Toca una jornada futura para simular hasta ese punto
-          </p>
           <div className="space-y-3">
             {Object.entries(fixturesByMatchday)
               .filter(([md]) => parseInt(md) >= currentMatchday - 1)
@@ -424,13 +431,11 @@ export function FixturesPage() {
                 const md = parseInt(matchday);
                 const isCurrentMD = md === currentMatchday;
                 const allPlayed = fixtures.every(f => f.status === 'FINISHED');
-                const isFutureMD = md > currentMatchday && !allPlayed;
 
                 return (
                   <div
                     key={matchday}
-                    onClick={() => isFutureMD && setShowSimulateConfirm(md)}
-                    className={`card p-0 overflow-hidden ${isCurrentMD ? 'border-[var(--color-accent-green)]' : ''} ${isFutureMD ? 'cursor-pointer hover:border-[var(--color-accent-cyan)]' : ''}`}
+                    className={`card p-0 overflow-hidden ${isCurrentMD ? 'border-[var(--color-accent-green)]' : ''}`}
                   >
                     <div className={`p-2 border-b border-[var(--color-border)] flex justify-between items-center ${
                       isCurrentMD ? 'bg-[var(--color-accent-green)]/10' : 'bg-[var(--color-bg-tertiary)]'
@@ -440,11 +445,6 @@ export function FixturesPage() {
                         {isCurrentMD && (
                           <span className="text-[10px] bg-[var(--color-accent-green)] text-black px-2 py-0.5 rounded-full font-bold">
                             ACTUAL
-                          </span>
-                        )}
-                        {isFutureMD && (
-                          <span className="text-[10px] bg-[var(--color-accent-cyan)]/20 text-[var(--color-accent-cyan)] px-2 py-0.5 rounded-full font-bold">
-                            Simular →
                           </span>
                         )}
                       </div>

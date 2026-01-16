@@ -95,7 +95,7 @@ export function WorldPage() {
         .filter(p => {
           if (p.clubId === userClub.id) return false;
           if (p.transferStatus === 'LISTED' || p.transferStatus === 'LOAN_LISTED') return true;
-          if (p.releaseClause && p.releaseClause <= userClub.budget * 1.5) return true;
+          if (p.releaseClause && p.releaseClause <= (userClub.budget || 0) * 1.5) return true;
           return false;
         })
         .sort((a, b) => b.skillBase - a.skillBase)
@@ -422,7 +422,7 @@ export function WorldPage() {
             </h3>
             <div className="space-y-2">
               {displayPlayers.map((player) => {
-                const canAfford = player.marketValue <= userClub.budget;
+                const canAfford = player.marketValue <= (userClub.budget || 0);
                 return (
                   <div
                     key={player.id}
@@ -481,7 +481,7 @@ export function WorldPage() {
               <div className="space-y-2">
                 {displayPlayers.map((player) => {
                   const club = currentSave.clubs.find(c => c.id === player.clubId);
-                  const canAfford = player.marketValue <= userClub.budget;
+                  const canAfford = player.marketValue <= (userClub.budget || 0);
                   return (
                     <div
                       key={player.id}
@@ -553,7 +553,7 @@ export function WorldPage() {
       {offerPlayer && (
         <TransferOfferModal
           player={offerPlayer}
-          userBudget={userClub.budget}
+          userBudget={userClub.budget || 0}
           onMakeOffer={makeTransferOffer}
           onClose={() => setOfferPlayer(null)}
         />

@@ -118,7 +118,7 @@ export function MarketPage() {
           <div className="text-right">
             <div className="text-xs text-[var(--color-text-secondary)]">Presupuesto</div>
             <div className="text-lg font-mono font-bold text-[var(--color-accent-green)]">
-              {formatValue(userClub.budget)}
+              {formatValue(userClub.budget || 0)}
             </div>
           </div>
         </div>
@@ -241,7 +241,7 @@ export function MarketPage() {
       <div className="space-y-2">
         {displayPlayers.map((player) => {
           const playerClub = currentSave.clubs.find(c => c.id === player.clubId);
-          const canAfford = userClub.budget >= player.marketValue;
+          const canAfford = (userClub.budget || 0) >= player.marketValue;
 
           return (
             <div
@@ -342,7 +342,7 @@ export function MarketPage() {
           <div className="space-y-1">
             {youngTalents.map((player) => {
               const playerClub = currentSave.clubs.find(c => c.id === player.clubId);
-              const canAfford = userClub.budget >= player.marketValue;
+              const canAfford = (userClub.budget || 0) >= player.marketValue;
               return (
                 <div
                   key={player.id}
@@ -381,7 +381,7 @@ export function MarketPage() {
       {offerPlayer && (
         <TransferOfferModal
           player={offerPlayer}
-          userBudget={userClub.budget}
+          userBudget={userClub.budget || 0}
           onMakeOffer={makeTransferOffer}
           onClose={() => setOfferPlayer(null)}
         />

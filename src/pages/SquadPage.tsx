@@ -657,7 +657,7 @@ export function SquadPage() {
           <div className="py-3 text-center">
             <div className="text-[10px] text-[var(--color-text-secondary)]">Presupuesto</div>
             <div className="font-mono text-sm font-bold text-[var(--color-accent-green)]">
-              {formatCurrency(club.budget)}
+              {formatCurrency(club.budget || 0)}
             </div>
           </div>
         </div>
