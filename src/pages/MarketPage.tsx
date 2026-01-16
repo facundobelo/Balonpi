@@ -84,6 +84,15 @@ export function MarketPage() {
       .slice(0, 5);
   }, [currentSave, userClub]);
 
+  // Check if transfer window is open
+  const isTransferWindowOpen = useMemo(() => {
+    if (!currentSave?.gameDate) return false;
+    const date = new Date(currentSave.gameDate);
+    const month = date.getMonth(); // 0-indexed
+    // July (6), August (7), January (0)
+    return month === 6 || month === 7 || month === 0;
+  }, [currentSave?.gameDate]);
+
   if (!currentSave || !userClub) {
     return (
       <div className="p-4 flex items-center justify-center min-h-[50vh]">
@@ -111,7 +120,11 @@ export function MarketPage() {
             <h1 className="text-2xl font-bold">Mercado</h1>
             <div className="flex items-center gap-4 mt-1">
               <span className="text-[var(--color-text-secondary)] text-sm">
-                Ventana: <span className="text-[var(--color-accent-green)]">Abierta</span>
+                Ventana: {isTransferWindowOpen ? (
+                  <span className="text-[var(--color-accent-green)]">Abierta</span>
+                ) : (
+                  <span className="text-[var(--color-accent-red)]">Cerrada</span>
+                )}
               </span>
             </div>
           </div>
